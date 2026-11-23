@@ -364,3 +364,15 @@ button.danger-btn:hover { background: #973532; }
 a.powered-netlify { color: var(--muted); text-decoration: underline; }
 @media (max-width: 860px) { .shots, .oss-grid { grid-template-columns: 1fr; } .hero { padding-top: 1.5rem; } }
 .shots img { aspect-ratio: 4 / 3; object-fit: cover; object-position: top left; }
+
+/* origin story */
+.story { margin: 1rem 0 2.5rem; padding: 1.8rem 2rem; }
+.story h2 { font-size: 1.55rem; margin-bottom: 1rem; }
+.story-grid { display: grid; grid-template-columns: 1.25fr 1fr; gap: 2rem; align-items: start; }
+.story-text p { margin: 0 0 .9rem; color: #2f3733; line-height: 1.6; }
+.story-fixes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .7rem; }
+.story-fixes li { display: flex; gap: .8rem; align-items: flex-start; background: var(--accent-soft); border: 1px solid #c9ddd1; border-radius: 10px; padding: .75rem .9rem; }
+.story-fixes li > span { font-size: 1.2rem; white-space: nowrap; }
+.story-fixes strong { display: block; color: var(--accent); margin-bottom: .15rem; }
+.story-fixes div { font-size: .9rem; color: #2f3733; }
+@media (max-width: 860px) { .story { padding: 1.2rem; } .story-grid { grid-template-columns: 1fr; } }

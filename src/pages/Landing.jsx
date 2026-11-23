@@ -44,6 +44,45 @@ export default function Landing({ onSignIn, onSignUp }) {
         <p className="muted small">Students: use the invitation link from your PI. Professors: create an account and request a lab space; requests are reviewed by the platform admin.</p>
       </section>
 
+      <section className="story card">
+        <p className="eyebrow">Why this exists</p>
+        <h2>Built by a PI, from the problems of running a real lab</h2>
+        <div className="story-grid">
+          <div className="story-text">
+            <p>
+              {PLATFORM_NAME} was built by <a href="https://judeokolie.com" target="_blank" rel="noreferrer"><strong>Jude Okolie</strong></a>, a faculty member who
+              runs a research group and kept hitting the same problems most PIs know well.
+            </p>
+            <p>
+              <strong>Paper-based protocols.</strong> Procedures lived in lab notebooks, printouts and scattered files. They were hard to find,
+              hard to update, and impossible to review consistently. When a student graduated, much of how an experiment was actually done went with them.
+            </p>
+            <p>
+              <strong>Incomplete or missing data.</strong> Key details such as concentrations, volumes, reagent lots and the small changes made
+              on the day were often left unrecorded, so results were hard to reproduce and troubleshooting meant guesswork.
+            </p>
+            <p>
+              <strong>Unclear expectations for students.</strong> Without a shared standard for what a complete protocol looks like, or when work
+              should be reviewed, students and the PI weren't always on the same page. That meant repeated corrections and frustration on both sides.
+            </p>
+            <p>
+              <strong>Documentation for tenure & promotion.</strong> On top of running the lab, every review cycle meant rebuilding a record of
+              papers, grants, teaching and mentoring from memory and old emails.
+            </p>
+            <p>
+              This platform is the answer to those problems, and it's shared openly so other research groups don't have to start from scratch.
+            </p>
+          </div>
+          <ul className="story-fixes">
+            <li><span>📄 → 💻</span><div><strong>From paper to one shared library</strong>Searchable, printable protocols with photos, videos and tables, and every version kept.</div></li>
+            <li><span>✅</span><div><strong>Complete by design</strong>Every protocol has the same sections (objective, materials, equipment, procedure, safety, notes), so nothing important gets skipped.</div></li>
+            <li><span>🤝</span><div><strong>Clear expectations</strong>Students submit; the PI approves or requests specific changes in writing. Everyone can see where each protocol stands.</div></li>
+            <li><span>🔎</span><div><strong>Traceable lab data</strong>Inventory use is logged with who, what, how much and why, linked to the experiment. Activity is recorded automatically.</div></li>
+            <li><span>🎓</span><div><strong>Tenure records that build themselves</strong>Log activities as they happen, or let the AI import your CV, then print a dossier when it's time.</div></li>
+          </ul>
+        </div>
+      </section>
+
       <section className="shot-main">
         <img src="/screenshots/dashboard.jpg" alt="Lab dashboard with protocol status counts, inventory alerts and recent activity (sample data)" loading="lazy" />
       </section>

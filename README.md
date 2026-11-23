@@ -4,6 +4,10 @@
 
 Built for research groups that keep protocols in scattered Word files, track reagents on paper, and rebuild their tenure dossier from memory every year. One deployment hosts **many labs**: professors sign up and request a lab space, the platform admin approves it, and each PI invites their own students. Labs are fully isolated from each other. Runs on [Netlify](https://www.netlify.com/) with no servers to manage — host a shared platform for your department or institution, or just for your own group.
 
+### Why this exists
+
+Built by [Jude Okolie](https://judeokolie.com), a faculty member who runs a research group, to solve problems many PIs share: paper-based protocols that are hard to find, update and review; incomplete or missing experimental data (concentrations, volumes, lots, on-the-day changes) that make results hard to reproduce; unclear expectations for students about what complete documentation looks like and when work gets reviewed; and rebuilding a tenure & promotion record from memory every review cycle. It's shared openly so other research groups don't have to start from scratch.
+
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/judebebo32/research-lab-hub)
 
 > Live example: the Okolie Lab runs this at its own invite-only site. Screenshots below use made-up sample data.

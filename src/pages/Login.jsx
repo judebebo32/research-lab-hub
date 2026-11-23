@@ -5,7 +5,7 @@ import { login, signup, handleAuthCallback, acceptInvite, updateUser, requestPas
 // Sign in / create account, plus the links Netlify Identity emails out:
 // email confirmation, invites (set first password) and password recovery.
 // /join?lab=<short name>&email=<address> opens straight on "create account" for an invited person.
-export default function Login({ recovering = false, onDone }) {
+export default function Login({ recovering = false, onDone, startMode = "login", onBack }) {
   const params = new URLSearchParams(window.location.search);
   const joinSlug = window.location.pathname === "/join" ? params.get("lab") : null;
   const [mode, setMode] = useState("checking"); // checking | login | signup | sent | invite | recovery | forgot
@@ -28,7 +28,7 @@ export default function Login({ recovering = false, onDone }) {
         } else if (recovering || result?.type === "recovery") {
           setMode("recovery");
         } else {
-          setMode(joinSlug ? "signup" : "login");
+          setMode(joinSlug || startMode === "signup" ? "signup" : "login");
         }
       })
       .catch((e) => {
@@ -132,7 +132,10 @@ export default function Login({ recovering = false, onDone }) {
 
         {msg && <p className="ok">{msg}</p>}
         {error && <p className="error">{error}</p>}
-        <p className="fine center"><a href="/privacy">Privacy & data security</a> · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a></p>
+        <p className="fine center">
+          {onBack && <><button type="button" className="link" onClick={onBack}>About this project</button> · </>}
+          <a href="/privacy">Privacy & data security</a> · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a>
+        </p>
       </div>
     </div>
   );

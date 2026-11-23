@@ -17,6 +17,7 @@ import LabSettings from "./pages/LabSettings.jsx";
 import Platform from "./pages/Platform.jsx";
 import Welcome from "./pages/Welcome.jsx";
 import Privacy from "./pages/Privacy.jsx";
+import Landing from "./pages/Landing.jsx";
 
 const MeContext = createContext(null);
 export const useMe = () => useContext(MeContext);
@@ -29,6 +30,9 @@ export default function App() {
   const location = useLocation();
   // Password-reset links log the user in; keep them on the "new password" form until done.
   const [recovering, setRecovering] = useState(() => window.location.hash.includes("recovery_token"));
+  // Logged-out visitors see the project homepage unless they arrived via a sign-in/invite/confirmation link.
+  const [authView, setAuthView] = useState(() =>
+    window.location.pathname === "/join" || window.location.pathname === "/login" || /_token=/.test(window.location.hash) ? "login" : null);
 
   useEffect(() => {
     getUser().then((u) => setAuthUser(u || null)).catch(() => setAuthUser(null));
@@ -73,7 +77,10 @@ export default function App() {
   if (location.pathname === "/privacy" && !me) return <Privacy standalone />;
   if (authUser === undefined) return <div className="splash">Loading…</div>;
   if (recovering) return <Login recovering onDone={() => setRecovering(false)} />;
-  if (!authUser) return <Login />;
+  if (!authUser) {
+    if (!authView) return <Landing onSignIn={() => setAuthView("login")} onSignUp={() => setAuthView("signup")} />;
+    return <Login startMode={authView} onBack={() => setAuthView(null)} />;
+  }
   if (!me) {
     return (
       <div className="splash">
@@ -133,7 +140,7 @@ export default function App() {
           {inLab && <NavLink to="/start">+ Start another lab</NavLink>}
           <NavLink to="/profile">My profile</NavLink>
           <button className="ghost logout" onClick={() => logout()}>Log out</button>
-          <div className="platform-foot">{PLATFORM_NAME} · <NavLink to="/privacy">Privacy & security</NavLink> · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a></div>
+          <div className="platform-foot">{PLATFORM_NAME} · <NavLink to="/privacy">Privacy & security</NavLink> · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a> · <a href="https://github.com/judebebo32/research-lab-hub" target="_blank" rel="noreferrer">Open source</a></div>
         </nav>
         <main className="content">
           <Routes>

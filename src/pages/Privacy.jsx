@@ -13,7 +13,7 @@ export default function Privacy({ standalone = false }) {
     <div className="privacy-wrap">
       <div className="brand big"><span className="logo" aria-hidden>⚗</span> {PLATFORM_NAME}</div>
       {body}
-      <p className="muted small center"><a href="/">← Back to sign in</a></p>
+      <p className="muted small center"><a href="/">← Back to {PLATFORM_NAME}</a></p>
     </div>
   );
 }

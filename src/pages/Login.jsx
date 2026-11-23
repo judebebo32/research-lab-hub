@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
-import { LAB_NAME } from "../config.js";
-import { login, handleAuthCallback, acceptInvite, updateUser, requestPasswordRecovery } from "@netlify/identity";
+import { PLATFORM_NAME } from "../config.js";
+import { login, signup, handleAuthCallback, acceptInvite, updateUser, requestPasswordRecovery } from "@netlify/identity";
 
-// Handles normal login plus the links Netlify Identity emails out:
-// invites (set first password), password recovery and email confirmation.
+// Sign in / create account, plus the links Netlify Identity emails out:
+// email confirmation, invites (set first password) and password recovery.
+// /join?lab=<short name>&email=<address> opens straight on "create account" for an invited person.
 export default function Login({ recovering = false, onDone }) {
-  const [mode, setMode] = useState("checking"); // checking | login | invite | recovery | forgot
+  const params = new URLSearchParams(window.location.search);
+  const joinSlug = window.location.pathname === "/join" ? params.get("lab") : null;
+  const [mode, setMode] = useState("checking"); // checking | login | signup | sent | invite | recovery | forgot
   const [token, setToken] = useState(null);
-  const [email, setEmail] = useState("");
+  const [joinLab, setJoinLab] = useState(null);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState(params.get("email") || "");
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [msg, setMsg] = useState("");
@@ -23,17 +28,20 @@ export default function Login({ recovering = false, onDone }) {
         } else if (recovering || result?.type === "recovery") {
           setMode("recovery");
         } else {
-          setMode("login");
+          setMode(joinSlug ? "signup" : "login");
         }
       })
       .catch((e) => {
         setError(e.message || "That link is invalid or has expired.");
-        setMode("login");
+        setMode(joinSlug ? "signup" : "login");
       })
       .finally(() => {
         if (window.location.hash) history.replaceState(null, "", window.location.pathname);
       });
-  }, []);
+    if (joinSlug) {
+      fetch(`/api/public/labs/${encodeURIComponent(joinSlug)}`).then((r) => (r.ok ? r.json() : null)).then(setJoinLab).catch(() => {});
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = (fn) => async (e) => {
     e.preventDefault();
@@ -52,8 +60,9 @@ export default function Login({ recovering = false, onDone }) {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <div className="brand big"><span className="logo" aria-hidden>⚗</span> {LAB_NAME}</div>
-        <p className="muted">Protocols, inventory and lab records in one place.</p>
+        <div className="brand big"><span className="logo" aria-hidden>⚗</span> {PLATFORM_NAME}</div>
+        <p className="muted">Protocols, inventory and lab records for research groups — plus a private tenure & promotion tracker for faculty.</p>
+        {joinLab && <p className="notice">You've been invited to <strong>{joinLab.name}</strong>{joinLab.institution ? ` (${joinLab.institution})` : ""}. Create your account with the invited email — or sign in if you already have one.</p>}
 
         {mode === "login" && (
           <form onSubmit={run(() => login(email.trim(), password))}>
@@ -61,8 +70,32 @@ export default function Login({ recovering = false, onDone }) {
             <label>Password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
             <button disabled={busy}>{busy ? "Signing in…" : "Sign in"}</button>
             <button type="button" className="link" onClick={() => { setMode("forgot"); setError(""); }}>Forgot password?</button>
-            <p className="fine">Accounts are invite-only. Ask your PI for an invite.</p>
+            <p className="fine">New here? <button type="button" className="link" onClick={() => { setMode("signup"); setError(""); }}>Create an account</button> — students join the lab that invited them; PIs can request a lab space.</p>
           </form>
+        )}
+
+        {mode === "signup" && (
+          <form onSubmit={run(async () => {
+            checkPasswords();
+            const u = await signup(email.trim(), password, { full_name: name.trim() });
+            if (u?.confirmedAt) await login(email.trim(), password);
+            else setMode("sent");
+          })}>
+            <label>Full name<input autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required /></label>
+            <label>Email{joinSlug && <span className="muted small"> (use the address you were invited with)</span>}<input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required /></label>
+            <label>Password<input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required /></label>
+            <label>Confirm password<input type="password" autoComplete="new-password" value={password2} onChange={(e) => setPassword2(e.target.value)} required /></label>
+            <button disabled={busy}>{busy ? "Creating…" : "Create account"}</button>
+            <p className="fine">Already have an account? <button type="button" className="link" onClick={() => { setMode("login"); setError(""); }}>Sign in</button></p>
+          </form>
+        )}
+
+        {mode === "sent" && (
+          <div className="sent">
+            <h3>Check your email ✉️</h3>
+            <p>We sent a confirmation link to <strong>{email}</strong>. Click it to finish creating your account{joinLab ? ` and join ${joinLab.name}` : ""}.</p>
+            <p className="fine">Nothing there after a few minutes? Check spam, or <button type="button" className="link" onClick={() => setMode("signup")}>try again</button>.</p>
+          </div>
         )}
 
         {mode === "forgot" && (

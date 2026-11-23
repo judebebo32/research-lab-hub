@@ -1,8 +1,11 @@
-// Tiny fetch wrapper. The Netlify Identity cookie (nf_jwt) is sent automatically.
+import { labHeaders } from "./config.js";
+
+// Tiny fetch wrapper. The Netlify Identity cookie (nf_jwt) is sent automatically;
+// X-Lab-Id tells the server which of the person's labs this request is for.
 async function request(method, path, body) {
   const res = await fetch(`/api${path}`, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: { ...labHeaders(), ...(body ? { "Content-Type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined,
     credentials: "same-origin",
   });
@@ -11,6 +14,7 @@ async function request(method, path, body) {
   if (!res.ok) {
     const e = new Error(data?.error || `Request failed (${res.status})`);
     e.status = res.status;
+    e.code = data?.code;
     throw e;
   }
   return data;

@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import { Routes, Route, NavLink, Navigate, useLocation } from "react-router-dom";
 import { getUser, logout, onAuthChange } from "@netlify/identity";
 import { api } from "./api.js";
-import { LAB_NAME } from "./config.js";
+import { PLATFORM_NAME, getLabId, setLabId } from "./config.js";
 import Login from "./pages/Login.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
 import Protocols from "./pages/Protocols.jsx";
@@ -13,6 +13,9 @@ import Activity from "./pages/Activity.jsx";
 import Members from "./pages/Members.jsx";
 import Tenure from "./pages/Tenure.jsx";
 import Profile from "./pages/Profile.jsx";
+import LabSettings from "./pages/LabSettings.jsx";
+import Platform from "./pages/Platform.jsx";
+import Welcome from "./pages/Welcome.jsx";
 
 const MeContext = createContext(null);
 export const useMe = () => useContext(MeContext);
@@ -34,7 +37,16 @@ export default function App() {
   const loadMe = useCallback(async () => {
     try {
       setLoadError("");
-      const m = await api.get("/me");
+      // Arriving from an invitation link: open that lab.
+      const join = new URLSearchParams(window.location.search).get("lab");
+      let m = await api.get("/me");
+      const wanted = join ? m.labs.find((l) => l.slug === join) : null;
+      const current = wanted || m.labs.find((l) => String(l.lab_id) === getLabId()) || m.labs[0];
+      if (current && String(current.lab_id) !== String(m.lab_id)) {
+        setLabId(current.lab_id);
+        m = await api.get("/me");
+      } else if (current) setLabId(current.lab_id);
+      else setLabId(null);
       setMe({ ...m, can: m.can || [] });
     } catch (e) {
       setMe(null);
@@ -54,6 +66,8 @@ export default function App() {
   }, [authUser, loadMe]);
 
   useEffect(() => setMenuOpen(false), [location.pathname]);
+
+  const switchLab = (id) => { setLabId(id); window.location.assign("/"); };
 
   if (authUser === undefined) return <div className="splash">Loading…</div>;
   if (recovering) return <Login recovering onDone={() => setRecovering(false)} />;
@@ -75,30 +89,38 @@ export default function App() {
     );
   }
 
+  const inLab = !!me.lab_id;
   const has = (p) => me.can?.includes(p);
-  const seesMembers = has("manage_members") || has("view_activity");
-  const roleLabel = me.role === "owner" ? "PI / Owner" : me.role === "admin" ? "Admin" : "Student";
-  const nav = [
+  const seesMembers = inLab && (has("manage_members") || has("view_activity") || me.role === "owner");
+  const roleLabel = me.role === "owner" ? "PI / Owner" : me.role === "admin" ? "Admin" : me.role === "student" ? "Student" : "";
+  const nav = inLab ? [
     ["/", "Dashboard"],
     ["/protocols", "Protocols"],
     ["/inventory", "Inventory"],
     ["/activity", has("view_activity") ? "Lab activity" : "My activity"],
-    ...(seesMembers ? [["/members", has("owner") ? "Members & access" : "Members"]] : []),
-    ...(has("tenure") ? [["/tenure", "Tenure & promotion"]] : []),
-  ];
+    ...(seesMembers ? [["/members", "Members"]] : []),
+    ...(me.role === "owner" ? [["/lab-settings", "Lab settings"]] : []),
+  ] : [["/", "Get started"]];
+  if (me.has_tenure) nav.push(["/tenure", "Tenure & promotion"]);
+  if (me.is_platform_admin) nav.push(["/platform", "Platform admin"]);
 
   return (
-    <MeContext.Provider value={{ me, reloadMe: loadMe }}>
+    <MeContext.Provider value={{ me, reloadMe: loadMe, switchLab }}>
       <div className="shell">
         <header className="topbar">
           <button className="menu-btn ghost" aria-label="Menu" onClick={() => setMenuOpen((o) => !o)}>☰</button>
           <div className="brand">
             <span className="logo" aria-hidden>⚗</span>
-            <span>{LAB_NAME}</span>
+            <span className="brand-name">{inLab ? me.lab.name : PLATFORM_NAME}</span>
           </div>
+          {me.labs.length > 1 && (
+            <select className="lab-switch" value={me.lab_id || ""} onChange={(e) => switchLab(e.target.value)} aria-label="Switch lab">
+              {me.labs.map((l) => <option key={l.lab_id} value={l.lab_id}>{l.name}</option>)}
+            </select>
+          )}
           <NavLink to="/profile" className="me-chip">
             {me.full_name || me.email}
-            <span className={`role-tag ${me.role}`}>{roleLabel}</span>
+            {roleLabel && <span className={`role-tag ${me.role}`}>{roleLabel}</span>}
           </NavLink>
         </header>
         <nav className={`sidebar ${menuOpen ? "open" : ""}`}>
@@ -106,21 +128,32 @@ export default function App() {
             <NavLink key={to} to={to} end={to === "/"}>{label}</NavLink>
           ))}
           <div className="spacer" />
+          {inLab && <NavLink to="/start">+ Start another lab</NavLink>}
           <NavLink to="/profile">My profile</NavLink>
           <button className="ghost logout" onClick={() => logout()}>Log out</button>
+          <div className="platform-foot">{PLATFORM_NAME} · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a></div>
         </nav>
         <main className="content">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/protocols" element={<Protocols />} />
-            <Route path="/protocols/new" element={<ProtocolEditor />} />
-            <Route path="/protocols/:id" element={<ProtocolView />} />
-            <Route path="/protocols/:id/edit" element={<ProtocolEditor />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/activity" element={<Activity />} />
+            {inLab ? (
+              <>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/protocols" element={<Protocols />} />
+                <Route path="/protocols/new" element={<ProtocolEditor />} />
+                <Route path="/protocols/:id" element={<ProtocolView />} />
+                <Route path="/protocols/:id/edit" element={<ProtocolEditor />} />
+                <Route path="/inventory" element={<Inventory />} />
+                <Route path="/activity" element={<Activity />} />
+                {seesMembers && <Route path="/members" element={<Members />} />}
+                {me.role === "owner" && <Route path="/lab-settings" element={<LabSettings />} />}
+                <Route path="/start" element={<Welcome another />} />
+              </>
+            ) : (
+              <Route path="/" element={<Welcome />} />
+            )}
             <Route path="/profile" element={<Profile />} />
-            {seesMembers && <Route path="/members" element={<Members />} />}
-            {has("tenure") && <Route path="/tenure" element={<Tenure />} />}
+            {me.has_tenure && <Route path="/tenure" element={<Tenure />} />}
+            {me.is_platform_admin && <Route path="/platform" element={<Platform />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

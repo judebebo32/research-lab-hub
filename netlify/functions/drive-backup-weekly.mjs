@@ -1,11 +1,11 @@
-// Weekly trigger for the Google Drive backup.
-import { getSetting, triggerBackgroundBackup } from "../../lib/backup.mjs";
+// Weekly trigger: starts a Google Drive backup for every lab that connected Drive.
+import { driveConnectedLabs, triggerBackgroundBackup } from "../../lib/backup.mjs";
 
 export default async (req, context) => {
-  const g = await getSetting("google");
-  if (!g?.refresh_token) return; // not connected yet
   const site = Netlify.env.get("URL") || context.site?.url;
-  console.log("Triggered Drive backup:", await triggerBackgroundBackup(site));
+  for (const labId of await driveConnectedLabs()) {
+    console.log(`Triggered Drive backup for lab ${labId}:`, await triggerBackgroundBackup(site, labId));
+  }
 };
 
 // Sundays 11:20 PM US Eastern (04:20 UTC Monday in winter; 12:20 AM Monday during daylight time).

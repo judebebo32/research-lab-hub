@@ -2,8 +2,6 @@ import { useState } from "react";
 import { useMe } from "../App.jsx";
 import { api, fmtDate, fmtDateTime, isoDate } from "../api.js";
 import { useApi, Loading, ErrorMsg, PageHead, Modal } from "../ui.jsx";
-import DriveBackup from "./DriveBackup.jsx";
-import { LAB_SLUG } from "../config.js";
 
 const POSITIONS = ["PhD student", "MS student", "Undergraduate", "Postdoc", "Research staff", "Visiting scholar", "Lab manager", "Co-PI / collaborator"];
 
@@ -12,75 +10,71 @@ export const PERMS = [
   ["edit_protocols", "Edit any protocol", "Can change other members' protocols (edits are versioned)"],
   ["manage_inventory", "Remove inventory items", "Everyone can add and log use; this allows deleting items"],
   ["view_activity", "See lab activity", "All members' activity feed and lab-wide stats"],
-  ["manage_members", "Manage student profiles", "Edit students' position and mark them inactive"],
+  ["manage_members", "Manage students", "Invite students, edit their position, remove them from the lab"],
   ["tenure", "Own tenure tracker", "Their own private record (they never see yours)"],
 ];
 const PERM_LABEL = Object.fromEntries(PERMS.map(([k, l]) => [k, l]));
 const roleLabel = (r) => (r === "owner" ? "Owner" : r === "admin" ? "Admin" : "Student");
 
+function CopyLink({ link }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="copy-row">
+      <code>{link}</code>
+      <button type="button" className="small ghost" onClick={async () => { try { await navigator.clipboard.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* ignore */ } }}>{copied ? "Copied ✓" : "Copy"}</button>
+    </div>
+  );
+}
+
 export default function Members() {
   const { me } = useMe();
   const owner = me.role === "owner";
-  const canManage = me.can.includes("manage_members");
+  const canManage = owner || me.can.includes("manage_members");
   const { data, error, loading, reload } = useApi("/members");
-  const grants = useApi(owner ? "/access-grants" : null);
+  const grants = useApi(canManage ? "/access-grants" : null);
   const [editing, setEditing] = useState(null);
-  const [showInvite, setShowInvite] = useState(false);
-  const [showAddAdmin, setShowAddAdmin] = useState(false);
-  const [backupMsg, setBackupMsg] = useState("");
+  const [inviting, setInviting] = useState(null); // "student" | "admin"
 
-  const editable = (m) => owner ? m.role !== "owner" || m.id === me.id : canManage && m.role === "student";
-  const admins = (data || []).filter((m) => m.role !== "student");
-
-  const downloadBackup = async () => {
-    setBackupMsg("Preparing backup…");
-    try {
-      const b = await api.get("/backup");
-      const blob = new Blob([JSON.stringify(b, null, 2)], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `${LAB_SLUG}-backup-${isoDate(b.exported_at)}.json`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-      const n = Object.values(b.tables).reduce((s, t) => s + t.length, 0);
-      setBackupMsg(`Downloaded ${n} records. Save the file to your Google Drive backup folder.`);
-    } catch (e) { setBackupMsg(e.message); }
-  };
+  const editable = (m) => (owner ? m.role !== "owner" || m.id === me.id : canManage && m.role === "student");
+  const admins = (data || []).filter((m) => m.role !== "student" && m.active);
+  const reloadAll = () => { reload(); grants.reload(); };
 
   return (
     <>
-      <PageHead title={owner ? "Members & access" : "Lab members"} sub="Track each member's work. People appear here after their first sign-in.">
-        {owner && <button className="ghost" onClick={downloadBackup}>⬇ Download full backup</button>}
-        <button onClick={() => setShowInvite(true)}>+ Invite member</button>
+      <PageHead title="Lab members" sub={`Everyone in ${me.lab.name}. Track each person's protocols and activity.`}>
+        {canManage && <button onClick={() => setInviting("student")}>+ Invite student</button>}
+        {owner && <button className="secondary" onClick={() => setInviting("admin")}>+ Add admin</button>}
       </PageHead>
-      {backupMsg && <p className="ok">{backupMsg}</p>}
 
-      {owner && <DriveBackup />}
-
-      {owner && (
+      {canManage && (grants.data?.grants || []).length > 0 && (
         <section className="card">
-          <div className="card-head">
-            <h2>Admins & what they can do</h2>
-            <button className="small" onClick={() => setShowAddAdmin(true)}>+ Add admin</button>
-          </div>
-          <p className="muted small">You're the owner: you always have full access, and only you can add admins or change their permissions.</p>
+          <h2>Invitations waiting</h2>
+          <p className="muted small">These people join automatically when they create an account or sign in with this email. Send them their link.</p>
+          <ul className="list invites">
+            {grants.data.grants.map((g) => (
+              <li key={g.email}>
+                <div className="grow">
+                  <strong>{g.email}</strong> <span className={`role-tag ${g.role}`}>{roleLabel(g.role)}</span>
+                  {g.role === "admin" && <span className="muted small"> {g.permissions.map((p) => PERM_LABEL[p]).join(" · ") || "No permissions"}</span>}
+                  <CopyLink link={g.link} />
+                </div>
+                <button className="small ghost danger" onClick={async () => { await api.del(`/access-grants/${encodeURIComponent(g.email)}`); grants.reload(); }}>Cancel</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {owner && admins.length > 0 && (
+        <section className="card">
+          <h2>Admins & what they can do</h2>
           <ul className="list">
             {admins.map((m) => (
               <li key={m.id}>
                 <strong>{m.full_name || m.email}</strong>
                 <span className={`role-tag ${m.role}`}>{roleLabel(m.role)}</span>
-                <span className="muted small">
-                  {m.role === "owner" ? "Full access" : m.permissions?.length ? m.permissions.map((p) => PERM_LABEL[p]).join(" · ") : "No permissions yet"}
-                </span>
+                <span className="muted small">{m.role === "owner" ? "Full access" : m.permissions?.length ? m.permissions.map((p) => PERM_LABEL[p]).join(" · ") : "No permissions yet"}</span>
                 {m.role === "admin" && <button className="small ghost" onClick={() => setEditing(m)}>Change</button>}
-              </li>
-            ))}
-            {(grants.data?.grants || []).map((g) => (
-              <li key={g.email}>
-                <strong>{g.email}</strong>
-                <span className="badge">Pending first sign-in</span>
-                <span className="muted small">{g.permissions.map((p) => PERM_LABEL[p]).join(" · ") || "No permissions"}</span>
-                <button className="small ghost danger" onClick={async () => { await api.del(`/access-grants/${encodeURIComponent(g.email)}`); grants.reload(); }}>Cancel</button>
               </li>
             ))}
           </ul>
@@ -97,7 +91,7 @@ export default function Members() {
                 <tr key={m.id} className={m.active ? "" : "inactive"}>
                   <td><strong>{m.full_name || "—"}</strong><div className="muted small">{m.email}</div></td>
                   <td>{m.position || "—"}{m.start_date && <div className="muted small">since {fmtDate(m.start_date)}</div>}</td>
-                  <td><span className={`role-tag ${m.role}`}>{roleLabel(m.role)}</span>{!m.active && <span className="badge st-bad">Inactive</span>}</td>
+                  <td><span className={`role-tag ${m.role}`}>{roleLabel(m.role)}</span>{!m.active && <span className="badge st-bad">Left lab</span>}</td>
                   <td>{m.protocol_count} <span className="muted small">({m.approved_count} approved)</span></td>
                   <td>{m.activity_30d}</td>
                   <td className="muted">{m.last_seen ? fmtDateTime(m.last_seen) : "Never"}</td>
@@ -110,17 +104,7 @@ export default function Members() {
       )}
 
       {editing && <EditMember m={editing} owner={owner} self={editing.id === me.id} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); }} />}
-      {showAddAdmin && <AddAdmin onClose={() => setShowAddAdmin(false)} onSaved={() => { setShowAddAdmin(false); reload(); grants.reload(); }} />}
-      {showInvite && (
-        <Modal title="Invite a lab member" onClose={() => setShowInvite(false)}>
-          <ol className="steps">
-            <li>Open <a href="https://app.netlify.com/" target="_blank" rel="noreferrer">Netlify</a> → this project → <strong>Users and sign-in</strong> (Identity).</li>
-            <li>Click <strong>Invite users</strong> and enter their email.</li>
-            <li>They click the emailed link and choose a password on this site.</li>
-            <li>They join as a <em>Student</em> — unless you added their email under <strong>Add admin</strong> first, in which case they get exactly the admin permissions you chose.</li>
-          </ol>
-        </Modal>
-      )}
+      {inviting && <Invite role={inviting} labName={me.lab.name} onClose={() => { setInviting(null); reloadAll(); }} />}
     </>
   );
 }
@@ -139,29 +123,46 @@ function PermChecks({ value, onChange }) {
   );
 }
 
-function AddAdmin({ onClose, onSaved }) {
+function Invite({ role, labName, onClose }) {
   const [email, setEmail] = useState("");
   const [perms, setPerms] = useState(["review_protocols", "view_activity"]);
   const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
   const save = async (e) => {
     e.preventDefault(); setError("");
-    try { await api.post("/access-grants", { email, permissions: perms }); onSaved(); } catch (err) { setError(err.message); }
+    try { setResult(await api.post("/access-grants", { email, role, permissions: role === "admin" ? perms : [] })); } catch (err) { setError(err.message); }
   };
+  const message = result && `Hi! I've added you to ${labName} on our lab management site. Open this link, create your account with ${email}, and you'll be in:\n${result.link}`;
   return (
-    <Modal title="Add an admin" onClose={onClose}>
-      <form className="form" onSubmit={save}>
-        <label>Their email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus placeholder="colleague@university.edu" /></label>
-        <div><label>What can they do?</label><PermChecks value={perms} onChange={setPerms} /></div>
-        <p className="muted small">If they already have an account, this applies right away. Otherwise it applies the first time they sign in — you still need to invite them through Netlify Identity.</p>
-        <ErrorMsg error={error} />
-        <div className="row end"><button type="button" className="ghost" onClick={onClose}>Cancel</button><button>Save admin</button></div>
-      </form>
+    <Modal title={role === "admin" ? "Add an admin" : "Invite a student"} onClose={onClose}>
+      {!result ? (
+        <form className="form" onSubmit={save}>
+          <label>Their email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoFocus placeholder="name@university.edu" /></label>
+          {role === "admin" && <div><label>What can they do?</label><PermChecks value={perms} onChange={setPerms} /></div>}
+          <ErrorMsg error={error} />
+          <div className="row end"><button type="button" className="ghost" onClick={onClose}>Cancel</button><button>{role === "admin" ? "Add admin" : "Invite"}</button></div>
+        </form>
+      ) : (
+        <div className="form">
+          {result.applied
+            ? <p className="ok">{email} already has an account — they're in the lab now. They'll see it next time they open the site.</p>
+            : <p className="ok">Invitation ready. {email} joins automatically when they create an account with that email.</p>}
+          <label>Send them this link</label>
+          <CopyLink link={result.link} />
+          <label>Or copy a ready-made message</label>
+          <textarea rows={4} readOnly value={message} onFocus={(e) => e.target.select()} />
+          <div className="row end">
+            <a className="btn ghost" href={`mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(`Join ${labName}`)}&body=${encodeURIComponent(message)}`}>Open in email</a>
+            <button type="button" onClick={onClose}>Done</button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }
 
 function EditMember({ m, owner, self, onClose, onSaved }) {
-  const [f, setF] = useState({ full_name: m.full_name || "", position: m.position || "", start_date: isoDate(m.start_date), role: m.role, active: m.active, permissions: m.permissions || [] });
+  const [f, setF] = useState({ position: m.position || "", start_date: isoDate(m.start_date), role: m.role, active: m.active, permissions: m.permissions || [] });
   const [error, setError] = useState("");
   const save = async (e) => {
     e.preventDefault();
@@ -171,7 +172,6 @@ function EditMember({ m, owner, self, onClose, onSaved }) {
   return (
     <Modal title={`Edit ${m.full_name || m.email}`} onClose={onClose}>
       <form className="form" onSubmit={save}>
-        <label>Full name<input value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} /></label>
         <label>Position
           <input list="positions" value={f.position} onChange={(e) => setF({ ...f, position: e.target.value })} />
           <datalist id="positions">{POSITIONS.map((p) => <option key={p} value={p} />)}</datalist>
@@ -188,7 +188,7 @@ function EditMember({ m, owner, self, onClose, onSaved }) {
             {f.role === "admin" && <div><label>Admin permissions</label><PermChecks value={f.permissions} onChange={(permissions) => setF({ ...f, permissions })} /></div>}
           </>
         )}
-        {!self && <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Active (uncheck when someone leaves — their records stay)</label>}
+        {!self && <label className="check"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Active in this lab (uncheck when someone leaves — their records stay)</label>}
         <ErrorMsg error={error} />
         <div className="row end"><button type="button" className="ghost" onClick={onClose}>Cancel</button><button>Save</button></div>
       </form>

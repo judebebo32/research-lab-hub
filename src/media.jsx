@@ -1,5 +1,6 @@
 import DOMPurify from "dompurify";
 import { api } from "./api.js";
+import { labHeaders } from "./config.js";
 
 export const MEDIA_TOKEN = /\[\[(image|video):(\d+)\]\]/g;
 const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -42,7 +43,7 @@ export async function uploadMedia(original, onProgress) {
     let tries = 0;
     for (;;) {
       const res = await fetch(`/api/media/${m.id}/chunks/${n}`, {
-        method: "PUT", body: part, headers: { "Content-Type": "application/octet-stream" }, credentials: "same-origin",
+        method: "PUT", body: part, headers: { ...labHeaders(), "Content-Type": "application/octet-stream" }, credentials: "same-origin",
       });
       if (res.ok) break;
       if (++tries >= 3) {

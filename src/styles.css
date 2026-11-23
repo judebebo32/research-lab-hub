@@ -297,3 +297,23 @@ button.swatch { width: 16px; height: 16px; min-width: 0; padding: 0; border-radi
 .ai-table input[type="number"] { width: 110px; }
 .ai-table tr.off td { opacity: .45; }
 .ai-table .badge { margin-top: .3rem; }
+
+/* multi-lab */
+.brand-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
+.lab-switch { width: auto; max-width: 220px; padding: .3rem .5rem; font-size: .85rem; }
+.platform-foot { font-size: .72rem; color: var(--muted); padding: .6rem .8rem 0; }
+.platform-foot a { color: var(--muted); text-decoration: underline; }
+.check.wrap { white-space: normal; align-items: flex-start; font-weight: 400; }
+.check.wrap input { margin-top: .25rem; }
+.invites li { align-items: flex-start; }
+.invites .grow { flex: 1; min-width: 0; }
+.usage { display: flex; flex-direction: column; gap: .5rem; }
+.usage-row { display: flex; justify-content: space-between; gap: 1rem; font-size: .9rem; }
+.bar { height: 8px; background: #efeee9; border-radius: 99px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--accent-2); }
+.bar > div.hot { background: var(--warn); }
+.lab-cards { display: flex; flex-direction: column; }
+.lab-card h2 { margin: 0; }
+.quote { background: #faf9f6; border-left: 3px solid var(--line); padding: .4rem .7rem; }
+.sent { margin-top: 1rem; }
+@media (max-width: 860px) { .lab-switch { max-width: 120px; } }

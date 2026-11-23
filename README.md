@@ -1,8 +1,8 @@
 # Research Lab Hub
 
-**An open-source platform for running a research lab:** experimental protocols with PI review, shared lab inventory, automatic activity tracking, and a private tenure & promotion record — with an AI assistant that turns a CV into structured records.
+**An open-source platform where professors run their labs:** experimental protocols with PI review, shared lab inventory, automatic activity tracking, and a private tenure & promotion record — with an AI assistant that turns a CV into structured records.
 
-Built for research groups that keep protocols in scattered Word files, track reagents on paper, and rebuild their tenure dossier from memory every year. Each lab deploys its own private copy on [Netlify](https://www.netlify.com/) in a few minutes; no servers to manage.
+Built for research groups that keep protocols in scattered Word files, track reagents on paper, and rebuild their tenure dossier from memory every year. One deployment hosts **many labs**: professors sign up and request a lab space, the platform admin approves it, and each PI invites their own students. Labs are fully isolated from each other. Runs on [Netlify](https://www.netlify.com/) with no servers to manage — host a shared platform for your department or institution, or just for your own group.
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/judebebo32/research-lab-hub)
 
@@ -33,9 +33,16 @@ Built for research groups that keep protocols in scattered Word files, track rea
 - **✨ AI import:** upload a CV (PDF/Word) or paste lists; Claude drafts entries, flags likely duplicates, and nothing is saved until you review it.
 - Printable dossier view and CSV export.
 
+**Many labs, one platform**
+- Professors create an account and request a lab (name, short link name, institution); a platform admin approves requests.
+- PIs invite students and co-admins by email from inside the app and get a join link to send — no hosting-dashboard access needed.
+- Every lab's protocols, inventory, files, activity and members are separated on the server; the platform admin sees usage numbers only.
+- Co-advised students belong to several labs and switch between them.
+- Free-with-limits model: per-lab photo/video storage and monthly AI-import limits, adjustable per lab.
+
 **People & access**
-- Invite-only accounts (Netlify Identity).
-- Owner role for the PI; add co-admins with fine-grained permissions (review protocols, edit protocols, manage inventory, see activity, manage students, own tenure tracker).
+- Owner role for each lab's PI; add co-admins with fine-grained permissions (review protocols, edit protocols, manage inventory, see activity, manage students, own tenure tracker).
+- PIs can rename their lab and its short name at any time.
 
 **Backups**
 - One-click full data download.
@@ -57,27 +64,33 @@ Built for research groups that keep protocols in scattered Word files, track rea
 | AI | Claude via Netlify AI Gateway (uses your Netlify credits; no API key needed) |
 | Jobs | Netlify background + scheduled functions (Drive backup, AI import) |
 
-## Set up your own lab hub
+## Host your own platform
 
 You need a free [Netlify](https://app.netlify.com/signup) account on a credit-based plan.
 
 1. **Deploy.** Click **Deploy to Netlify** above (or fork this repo and import it in Netlify). The database is created automatically on the first deploy.
-2. **Set two environment variables** in Netlify → your project → *Environment variables*, then redeploy:
+2. **Set environment variables** in Netlify → your project → *Environment variables*, then redeploy:
    | Variable | Example | What it does |
    |---|---|---|
-   | `ADMIN_EMAILS` | `pi@university.edu` | Email(s) that become the **owner** (comma-separated) |
-   | `LAB_NAME` | `Smith Lab Hub` | Name shown in the app and on backups |
-3. **Turn on logins.** Netlify → your project → **Users and sign-in** (Identity): enable it and set registration to **Invite only**.
-4. **Invite yourself**, open the email link and choose a password — you'll land in the hub as Owner.
-5. **Invite your students** the same way. To add a co-admin with specific permissions, use **Members & access → Add admin** before inviting them.
+   | `ADMIN_EMAILS` | `you@university.edu` | **Platform admins** who approve lab requests (comma-separated) |
+   | `PLATFORM_NAME` | `Chemistry Lab Hub` | Name of the platform shown on sign-in (default *Research Lab Hub*) |
+3. **Turn on logins.** Netlify → your project → **Users and sign-in** (Identity): enable it and set registration to **Open** (new accounts can't see anything until they're approved or invited). Keep email confirmation on.
+4. **Create your account** on the site, request your own lab, and approve it on the **Platform admin** page.
+5. **Invite your students** from **Members → Invite student** and send them the join link.
+
+Other professors simply create an account and request a lab; you approve them under **Platform admin**, where you can also adjust each lab's storage and AI limits (defaults: 2 GB, 5 AI imports/month).
 
 Optional:
-- **Google Drive backup:** *Members & access → Google Drive backup → Show setup steps* walks you through a 10-minute Google Cloud setup.
+- **Google Drive backup (per lab):** *Lab settings → Google Drive backup → Show setup steps* walks each PI through a 10-minute Google Cloud setup.
 - **AI import:** works automatically on credit-based Netlify plans via AI Gateway.
 
 ### Check with your institution
 
-Before storing student or research data, confirm with your IT/research office that this hosting is acceptable under your institution's data policies.
+Before storing student or research data, confirm with your IT/research office that this hosting is acceptable under your institution's data policies. If you host a shared platform for other labs, publish terms of use and a privacy notice that fit your institution, and review them with your institution's legal or research office.
+
+### Upgrading from the single-lab version
+
+Existing data moves into lab #1 automatically on deploy (named from the old `LAB_NAME` variable), with everyone keeping their role. Switch Identity registration to **Open** so new professors and students can sign up.
 
 ## Develop locally
 

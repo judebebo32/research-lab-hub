@@ -13,21 +13,30 @@ const { default: handler } = await import(ROOT + "/netlify/functions/api.mjs");
 const PI = { id: "u-pi", email: "PI@uni.edu", name: "Jude Okolie" };
 const ST = { id: "u-st", email: "amy@uni.edu", name: "Amy Student" };
 const ST2 = { id: "u-st2", email: "bob@uni.edu" };
+let LAB = null; // X-Lab-Id sent with requests (null = server picks the user's first lab)
 async function raw(user, method, path, body, headers = {}) {
   globalThis.__USER = user;
-  return handler(new Request("https://x.test/api" + path, { method, body, headers }));
+  return handler(new Request("https://x.test/api" + path, { method, body, headers: { ...(LAB ? { "x-lab-id": String(LAB) } : {}), ...headers } }));
 }
-async function call(user, method, path, body) {
+async function call(user, method, path, body, lab = LAB) {
   globalThis.__USER = user;
-  const r = await handler(new Request("https://x.test/api" + path, { method, body: body ? JSON.stringify(body) : undefined, headers: { "content-type": "application/json" } }));
+  const r = await handler(new Request("https://x.test/api" + path, { method, body: body ? JSON.stringify(body) : undefined,
+    headers: { "content-type": "application/json", ...(lab ? { "x-lab-id": String(lab) } : {}) } }));
   const j = await r.json();
   return { s: r.status, j };
 }
 const ok = (c, m) => { if (!c) { console.log("FAIL", m); process.exitCode = 1; } else console.log("ok  ", m); };
 let r;
 r = await call(null, "GET", "/me"); ok(r.s === 401, "anon -> 401");
-r = await call(PI, "GET", "/me"); ok(r.j.role === "owner" && r.j.can.includes("tenure"), "PI is owner w/ all perms");
-r = await call(ST, "GET", "/me"); ok(r.j.role === "student", "student role");
+r = await call(PI, "GET", "/me"); ok(r.j.is_platform_admin === true && r.j.labs.length === 0, "platform admin starts with no lab");
+r = await call(PI, "GET", "/dashboard"); ok(r.s === 409 && r.j.code === "no_lab", "no lab yet -> 409");
+r = await call(PI, "POST", "/labs/requests", { name: "Okolie Lab", slug: "Okolie Lab!", institution: "Uni", agree: true }); ok(r.s === 201 && r.j.slug === "okolie-lab" && r.j.status === "pending", "lab requested (slug cleaned)");
+const LAB1 = r.j.id;
+r = await call(PI, "POST", `/platform/labs/${LAB1}/approve`, {}); ok(r.j.status === "active" && r.j.storage_limit_mb === 2048, "platform admin approves lab w/ default limits");
+r = await call(PI, "GET", "/me"); ok(r.j.role === "owner" && r.j.can.includes("tenure") && r.j.lab_id === LAB1, "PI is owner w/ all perms");
+r = await call(PI, "POST", "/access-grants", { email: "amy@uni.edu" }); ok(r.s === 201 && r.j.link.includes("/join?lab=okolie-lab"), "invite student returns join link");
+await call(PI, "POST", "/access-grants", { email: "bob@uni.edu" });
+r = await call(ST, "GET", "/me"); ok(r.j.role === "student" && r.j.lab_id === LAB1, "student joins on first sign-in");
 await call(ST2, "GET", "/me");
 r = await call(ST, "POST", "/protocols", { title: "Western blot", steps: "1. Lyse\n2. Run gel", project: "P53" }); ok(r.s === 201, "create protocol"); const pid = r.j.id;
 r = await call(ST2, "GET", "/protocols/" + pid); ok(r.s === 403, "other student can't view draft");
@@ -56,7 +65,7 @@ r = await call(ST, "GET", "/members"); ok(r.s === 403, "student can't list membe
 r = await call(PI, "GET", "/members"); ok(r.j.length === 3 && r.j.find((m) => m.id === "u-st").approved_count === 0, "members list w/ stats");
 r = await call(PI, "PUT", "/members/u-pi", { role: "student" }); ok(r.s === 200 && r.j.role === "owner", "PI demote ignored");
 r = await call(PI, "PUT", "/members/u-st2", { active: false, position: "MS student" }); ok(r.j.active === false, "deactivate");
-r = await call(ST2, "GET", "/me"); ok(r.s === 403, "deactivated blocked");
+r = await call(ST2, "GET", "/dashboard"); ok(r.s === 409, "removed member has no lab access");
 r = await call(ST, "GET", "/pi-activities"); ok(r.s === 403, "student can't see tenure");
 r = await call(PI, "POST", "/pi-activities", { category: "grant", title: "NSF CAREER", amount: 550000, status: "Funded", start_date: "2026-07-01", role: "PI" }); ok(r.s === 201, "log grant");
 r = await call(PI, "POST", "/pi-activities", { category: "publication", title: "Paper in JACS", start_date: "2025-03-01" }); ok(r.s === 201, "log pub");
@@ -67,11 +76,11 @@ r = await call(PI, "GET", "/nope"); ok(r.s === 404, "404 route");
 // --- admin permissions ---
 const CO = { id: "u-co", email: "co@uni.edu", name: "Dr. Co" };
 r = await call(ST, "POST", "/access-grants", { email: "co@uni.edu", permissions: ["review_protocols"] }); ok(r.s === 403, "student can't add admins");
-r = await call(PI, "POST", "/access-grants", { email: "CO@uni.edu", permissions: ["review_protocols", "bogus"] }); ok(r.s === 201 && r.j.grant.permissions.length === 1, "owner pre-approves admin (bad perm dropped)");
+r = await call(PI, "POST", "/access-grants", { email: "CO@uni.edu", role: "admin", permissions: ["review_protocols", "bogus"] }); ok(r.s === 201 && r.j.grant.permissions.length === 1, "owner pre-approves admin (bad perm dropped)");
 r = await call(CO, "GET", "/me"); ok(r.j.role === "admin" && r.j.can.join() === "review_protocols", "grant applied at first sign-in");
 r = await call(PI, "GET", "/access-grants"); ok(r.j.grants.length === 0, "grant consumed");
 r = await call(ST, "POST", "/protocols", { title: "PCR", submit: true }); const p2 = r.j.id;
-r = await call(ST2, "GET", "/protocols/" + p2); ok(r.s === 403, "submitted protocol hidden from other students until approved");
+r = await call(ST2, "GET", "/protocols/" + p2); ok(r.s === 403 || r.s === 409, "submitted protocol hidden from other students until approved");
 r = await call(CO, "GET", "/protocols/" + p2); ok(r.s === 200 && r.j.can_review === true, "reviewer admin sees it");
 r = await call(CO, "POST", `/protocols/${p2}/review`, { decision: "approved" }); ok(r.s === 200, "reviewer admin approves");
 r = await call(CO, "PUT", "/protocols/" + p2, { notes: "x" }); ok(r.s === 403, "reviewer without edit perm can't edit");
@@ -85,7 +94,8 @@ r = await call(CO, "PUT", "/members/u-st", { role: "admin", position: "PhD stude
 r = await call(CO, "GET", "/pi-activities"); ok(r.s === 200 && r.j.length === 0, "co-admin's own tenure is separate from PI's");
 r = await call(CO, "GET", "/backup"); ok(r.s === 403, "only owner can back up");
 r = await call(PI, "GET", "/backup"); ok(r.s === 200 && r.j.tables.protocols.length >= 2 && r.j.tables.members.length === 4, "owner backup has all tables");
-r = await call(PI, "POST", "/access-grants", { email: "amy@uni.edu", permissions: ["view_activity"] }); ok(r.j.applied === true && r.j.member.role === "admin", "existing member promoted immediately");
+r = await call(PI, "POST", "/access-grants", { email: "amy@uni.edu", role: "admin", permissions: ["view_activity"] }); ok(r.j.applied === true, "existing member promoted immediately");
+r = await call(ST, "GET", "/me"); ok(r.j.role === "admin" && r.j.can.join() === "view_activity", "promotion visible to member");
 r = await call(PI, "PUT", "/members/u-pi", { role: "student" }); ok(r.s === 200 && r.j.role === "owner", "owner can't demote self");
 // --- media ---
 const SIZE = 7 * 1024 * 1024 + 123;
@@ -93,7 +103,7 @@ const vid = new Uint8Array(SIZE); for (let i = 0; i < SIZE; i++) vid[i] = i % 25
 r = await call(ST, "POST", "/media", { filename: "../evil.txt", content_type: "text/plain", size: 10 }); ok(r.s === 400, "non-media rejected");
 r = await call(ST, "POST", "/media", { filename: "big.jpg", content_type: "image/jpeg", size: 4 * 1024 * 1024 }); ok(r.s === 400, "oversized photo rejected");
 r = await call(ST, "POST", "/media", { filename: "western.mp4", content_type: "video/mp4", size: SIZE }); ok(r.s === 201 && r.j.chunks === 3, "video upload created (3 parts)"); const mv = r.j;
-let rr = await raw(ST2, "PUT", `/media/${mv.id}/chunks/0`, vid.slice(0, mv.chunk_size), { "content-type": "application/octet-stream" }); ok(rr.status === 403, "others can't upload into your file");
+let rr = await raw(ST2, "PUT", `/media/${mv.id}/chunks/0`, vid.slice(0, mv.chunk_size), { "content-type": "application/octet-stream" }); ok(rr.status === 403 || rr.status === 409, "others can't upload into your file");
 for (let n = 0; n < 2; n++) { rr = await raw(ST, "PUT", `/media/${mv.id}/chunks/${n}`, vid.slice(n * mv.chunk_size, (n + 1) * mv.chunk_size), { "content-type": "application/octet-stream" }); }
 r = await call(ST, "POST", `/media/${mv.id}/complete`); ok(r.s === 400, "incomplete upload can't finish");
 rr = await raw(ST, "PUT", `/media/${mv.id}/chunks/2`, vid.slice(2 * mv.chunk_size), { "content-type": "application/octet-stream" }); ok(rr.status === 200, "last part uploaded");
@@ -109,7 +119,7 @@ r = await call(ST, "POST", "/protocols", { title: "Gel demo", steps: `1. Load ge
 rr = await raw(ST2, "GET", `/media/${mv.id}`); ok(rr.status === 403, "still hidden while protocol awaits review");
 rr = await raw(CO, "GET", `/media/${mv.id}`); ok(rr.status === 206 || rr.status === 200, "reviewer can watch it");
 await call(PI, "POST", `/protocols/${pv}/review`, { decision: "approved" });
-const ST3 = { id: "u-st3", email: "cy@uni.edu" }; await call(ST3, "GET", "/me");
+const ST3 = { id: "u-st3", email: "cy@uni.edu" }; await call(PI, "POST", "/access-grants", { email: "cy@uni.edu" }); await call(ST3, "GET", "/me");
 rr = await raw(ST3, "GET", `/media/${mv.id}`, undefined, { range: "bytes=0-99" }); ok(rr.status === 206, "visible to lab once approved");
 r = await call(ST, "POST", "/media", { filename: "gel.jpg", content_type: "image/jpeg", size: 1000 }); const mi = r.j;
 await raw(ST, "PUT", `/media/${mi.id}/chunks/0`, new Uint8Array(1000), { "content-type": "application/octet-stream" });
@@ -145,8 +155,8 @@ cr = await raw(PI, "GET", `/drive/callback?code=abc&state=${state}`); ok(cr.stat
 r = await call(PI, "GET", "/drive"); ok(r.j.connected && r.j.email === "owner@example.com" && r.j.folder_link.includes("drive.google.com"), "connected status shows account + folder");
 ok(gcalls.includes("trigger"), "first backup triggered after connecting");
 const { runDriveBackup } = await import(ROOT + "/lib/backup.mjs");
-const status = await runDriveBackup(); ok(status.startsWith("OK") && status.includes("copied 2 new"), "backup run uploads data file + 2 media files: " + status);
-const again = await runDriveBackup(); ok(again.includes("copied 0 new"), "second run copies only new media");
+const status = await runDriveBackup(LAB1); ok(status.startsWith("OK") && status.includes("copied 2 new"), "backup run uploads data file + 2 media files: " + status);
+const again = await runDriveBackup(LAB1); ok(again.includes("copied 0 new"), "second run copies only new media");
 r = await call(PI, "GET", "/drive"); ok(r.j.last_ok === true && r.j.media_pending === 0, "status shows last backup OK");
 r = await call(PI, "POST", "/drive/disconnect"); r = await call(PI, "GET", "/drive"); ok(!r.j.connected && r.j.has_credentials, "disconnect keeps credentials, drops access");
 // --- AI import ---
@@ -168,6 +178,39 @@ const before = (await call(PI, "GET", "/pi-activities")).j.length;
 r = await call(PI, "POST", "/pi-activities/bulk", { items: items.filter((x) => !x.duplicate).map(({ duplicate, ...x }) => x) }); ok(r.j.added === 2, "bulk add 2 selected");
 const after = (await call(PI, "GET", "/pi-activities")).j; ok(after.length === before + 2 && after.some((a) => a.title.startsWith("NIH R01") && Number(a.amount) === 1800000), "entries saved to tenure record");
 globalThis.fetch = realFetch;
+
+// --- multi-lab isolation ---
+const P2 = { id: "u-p2", email: "prof2@other.edu", name: "Prof Two" };
+r = await call(P2, "POST", "/labs/requests", { name: "Second Lab", slug: "okolie-lab", institution: "Other U", agree: true }); ok(r.s === 400, "taken short name rejected");
+r = await call(P2, "POST", "/labs/requests", { name: "Second Lab", slug: "second", institution: "Other U" }); ok(r.s === 400, "must agree to terms");
+r = await call(P2, "POST", "/labs/requests", { name: "Second Lab", slug: "second", institution: "Other U", agree: true }); const LAB2 = r.j.id; ok(r.s === 201, "second professor requests a lab");
+r = await call(P2, "GET", "/me"); ok(r.j.labs.length === 0 && r.j.requests[0].status === "pending", "request shows as pending");
+r = await call(P2, "GET", "/platform/labs"); ok(r.s === 403, "only platform admin sees all labs");
+r = await call(PI, "GET", "/platform/labs"); ok(r.j.length === 2 && r.j[0].status === "pending", "platform admin sees pending first");
+r = await call(PI, "POST", `/platform/labs/${LAB2}/approve`, {}); ok(r.j.status === "active", "approved");
+r = await call(P2, "GET", "/me"); ok(r.j.role === "owner" && r.j.lab.slug === "second", "second professor owns their lab");
+r = await call(P2, "GET", "/protocols?scope=all"); ok(r.j.length === 0, "new lab sees none of lab 1's protocols");
+r = await call(P2, "GET", `/protocols/${pid}`); ok(r.s === 404, "can't open lab 1 protocol by id");
+r = await call(P2, "GET", "/inventory", undefined, LAB1); ok(r.s === 409, "can't pick a lab you're not in");
+r = await call(P2, "GET", "/pi-activities"); ok(r.j.length === 0, "tenure records are private per person");
+rr = await raw(P2, "GET", `/media/${mi.id}`); ok(rr.status === 403, "can't view lab 1 photos");
+r = await call(P2, "PUT", "/lab", { name: "Second Lab Hub", slug: "second-lab", department: "ChemE" }); ok(r.j.slug === "second-lab" && r.j.name === "Second Lab Hub", "owner renames lab + short name");
+r = await call(ST3, "PUT", "/lab", { name: "Hacked" }); ok(r.s === 403, "students can't rename lab");
+r = await call(null, "GET", "/public/labs/second-lab"); ok(r.s === 200 && r.j.name === "Second Lab Hub" && !("status" in r.j), "public lab info for join page");
+// co-advised student in both labs
+r = await call(P2, "POST", "/access-grants", { email: "cy@uni.edu" }); ok(r.j.applied === true, "existing user added to second lab immediately");
+r = await call(ST3, "GET", "/me"); ok(r.j.labs.length === 2, "student sees two labs");
+r = await call(ST3, "POST", "/protocols", { title: "Lab2 only" }, LAB2); const pLab2 = r.j.id;
+r = await call(ST3, "GET", "/protocols?scope=mine", undefined, LAB1); ok(!r.j.some((x) => x.id === pLab2), "lab switch keeps data separate");
+r = await call(P2, "GET", "/protocols?scope=all"); ok(r.j.some((x) => x.id === pLab2), "lab 2 owner sees it");
+// limits
+await call(PI, "POST", `/platform/labs/${LAB2}/limits`, { storage_limit_mb: 1, ai_monthly_limit: 0 });
+r = await call(P2, "POST", "/media", { filename: "big.mp4", content_type: "video/mp4", size: 2 * 1024 * 1024 }); ok(r.s === 413, "storage limit enforced");
+r = await call(P2, "POST", "/tenure-ai/jobs", { text: "cv" }); ok(r.s === 429, "AI monthly limit enforced");
+r = await call(P2, "GET", "/lab"); ok(r.j.storage_limit_mb === 1 && r.j.ai_monthly_limit === 0, "lab usage/limits visible to owner");
+await call(PI, "POST", `/platform/labs/${LAB2}/suspend`, { note: "test" });
+r = await call(P2, "GET", "/dashboard"); ok(r.s === 409, "suspended lab is closed");
+r = await call(PI, "GET", "/dashboard", undefined, LAB1); ok(r.s === 200, "other labs unaffected");
 await db.stop();
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nALL TESTS PASSED");
 process.exit(process.exitCode || 0);

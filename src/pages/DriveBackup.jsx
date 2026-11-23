@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { api, fmtDateTime } from "../api.js";
 import { useApi, ErrorMsg } from "../ui.jsx";
-import { LAB_NAME } from "../config.js";
 
 const ERRORS = {
   expired: "The Google sign-in took too long or was opened twice. Please click Connect again.",
@@ -10,7 +9,8 @@ const ERRORS = {
   no_refresh_token: "Google didn't give the app lasting access. In Google Cloud, make sure the app is Published (not Testing), then connect again.",
 };
 
-export default function DriveBackup() {
+export default function DriveBackup({ labName = "Lab" }) {
+  const LAB_NAME = labName;
   const { data, error, reload } = useApi("/drive");
   const [params, setParams] = useSearchParams();
   const [f, setF] = useState({ client_id: "", client_secret: "" });

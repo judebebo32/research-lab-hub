@@ -3,6 +3,6 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  envPrefix: ["VITE_", "LAB_"], // LAB_NAME is exposed to the browser (it's just the display name)
+  envPrefix: ["VITE_", "PLATFORM_"], // PLATFORM_NAME is exposed to the browser (display name only)
   build: { chunkSizeWarningLimit: 1500 },
 });

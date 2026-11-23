@@ -21,7 +21,7 @@ export default function Platform() {
 
   return (
     <>
-      <PageHead title="Platform admin" sub="Approve new labs and manage limits. You see usage numbers only — never a lab's protocols, inventory or members' work." />
+      <PageHead title="Platform admin" sub="Approve new labs and manage limits. You see usage numbers only — never a lab's protocols, inventory, files, members' work or anyone's tenure record." />
       {data && (
         <div className="stats">
           <div className="stat"><span className="n">{totals.labs}</span><span className="label">Active labs</span></div>
@@ -58,7 +58,7 @@ export default function Platform() {
                 {l.decision_note && <p className="small muted">Note: {l.decision_note}</p>}
                 {l.status !== "pending" && (
                   <p className="small">
-                    {l.members} members · {l.protocols} protocols · storage {mb(l.storage_bytes)}{l.storage_limit_mb != null ? ` / ${l.storage_limit_mb >= 1024 ? l.storage_limit_mb / 1024 + " GB" : l.storage_limit_mb + " MB"}` : " (unlimited)"} · AI {l.ai_this_month}{l.ai_monthly_limit != null ? ` / ${l.ai_monthly_limit}` : " (unlimited)"} this month
+                    {l.members} members · storage {mb(l.storage_bytes)}{l.storage_limit_mb != null ? ` / ${l.storage_limit_mb >= 1024 ? l.storage_limit_mb / 1024 + " GB" : l.storage_limit_mb + " MB"}` : " (unlimited)"} · AI {l.ai_this_month}{l.ai_monthly_limit != null ? ` / ${l.ai_monthly_limit}` : " (unlimited)"} this month
                   </p>
                 )}
                 <div className="row">

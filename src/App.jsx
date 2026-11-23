@@ -16,6 +16,7 @@ import Profile from "./pages/Profile.jsx";
 import LabSettings from "./pages/LabSettings.jsx";
 import Platform from "./pages/Platform.jsx";
 import Welcome from "./pages/Welcome.jsx";
+import Privacy from "./pages/Privacy.jsx";
 
 const MeContext = createContext(null);
 export const useMe = () => useContext(MeContext);
@@ -69,6 +70,7 @@ export default function App() {
 
   const switchLab = (id) => { setLabId(id); window.location.assign("/"); };
 
+  if (location.pathname === "/privacy" && !me) return <Privacy standalone />;
   if (authUser === undefined) return <div className="splash">Loading…</div>;
   if (recovering) return <Login recovering onDone={() => setRecovering(false)} />;
   if (!authUser) return <Login />;
@@ -131,7 +133,7 @@ export default function App() {
           {inLab && <NavLink to="/start">+ Start another lab</NavLink>}
           <NavLink to="/profile">My profile</NavLink>
           <button className="ghost logout" onClick={() => logout()}>Log out</button>
-          <div className="platform-foot">{PLATFORM_NAME} · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a></div>
+          <div className="platform-foot">{PLATFORM_NAME} · <NavLink to="/privacy">Privacy & security</NavLink> · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a></div>
         </nav>
         <main className="content">
           <Routes>
@@ -152,6 +154,7 @@ export default function App() {
               <Route path="/" element={<Welcome />} />
             )}
             <Route path="/profile" element={<Profile />} />
+            <Route path="/privacy" element={<Privacy />} />
             {me.has_tenure && <Route path="/tenure" element={<Tenure />} />}
             {me.is_platform_admin && <Route path="/platform" element={<Platform />} />}
             <Route path="*" element={<Navigate to="/" replace />} />

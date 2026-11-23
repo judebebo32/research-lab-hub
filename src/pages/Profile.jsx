@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { updateUser } from "@netlify/identity";
+import { updateUser, logout } from "@netlify/identity";
 import { useMe } from "../App.jsx";
 import { api } from "../api.js";
 import { PageHead, ErrorMsg } from "../ui.jsx";
@@ -39,6 +39,41 @@ export default function Profile() {
       </div>
       {msg && <p className="ok">{msg}</p>}
       <ErrorMsg error={error} />
+      <DeleteAccount me={me} />
     </>
+  );
+}
+
+function DeleteAccount({ me }) {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const owns = me.labs.filter((l) => l.role === "owner");
+  const del = async (e) => {
+    e.preventDefault(); setErr(""); setBusy(true);
+    try {
+      await api.del("/me", { confirm });
+      try { await logout(); } catch { /* account is gone */ }
+      window.location.assign("/");
+    } catch (x) { setErr(x.message); setBusy(false); }
+  };
+  return (
+    <section className="card danger-zone">
+      <h2>Delete my account</h2>
+      <p className="small">Removes your sign-in, your tenure & promotion record and your lab memberships. Work you contributed to a lab (such as protocols) stays with that lab under the name “Former member”. <a href="/privacy">Privacy & data security</a></p>
+      {owns.length > 0 ? (
+        <p className="notice small">You own {owns.map((l) => l.name).join(", ")}. Download its backup and delete the lab in <strong>Lab settings</strong> before deleting your account.</p>
+      ) : !open ? <button className="ghost danger" onClick={() => setOpen(true)}>Delete my account…</button> : (
+        <form className="form" onSubmit={del}>
+          <label>Type your email <code>{me.email}</code> to confirm<input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" /></label>
+          <ErrorMsg error={err} />
+          <div className="row">
+            <button type="button" className="ghost" onClick={() => { setOpen(false); setConfirm(""); }}>Cancel</button>
+            <button className="danger-btn" disabled={busy || confirm.trim().toLowerCase() !== me.email}>{busy ? "Deleting…" : "Permanently delete my account"}</button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }

@@ -1,6 +1,6 @@
 // Single API router for the lab app. Every request is authenticated with
 // Netlify Identity and authorized against the `members` table.
-import { getUser } from "@netlify/identity";
+import { getUser, admin as identityAdmin } from "@netlify/identity";
 import { getDatabase } from "@netlify/database";
 import { getStore } from "@netlify/blobs";
 import { exportAll, getSetting, setSetting, patchSetting, DRIVE_SCOPE, exchangeCode, googleAccessToken, driveUser,
@@ -740,13 +740,50 @@ route("PUT", "/lab", async ({ me, body }) => {
   return json(lab);
 });
 
+// Permanently delete a lab and everything in it (owner only; must type the short name).
+async function deleteLabFiles(labId) {
+  const store = mediaStore();
+  const files = await sql`SELECT id, chunks FROM media WHERE lab_id = ${labId}`;
+  const keys = files.flatMap((m) => Array.from({ length: m.chunks }, (_, n) => `${m.id}/${n}`));
+  for (let i = 0; i < keys.length; i += 25) await Promise.all(keys.slice(i, i + 25).map((k) => store.delete(k).catch(() => {})));
+}
+route("DELETE", "/lab", async ({ me, body }) => {
+  requireOwner(me);
+  if (String(body.confirm || "").trim() !== me.lab.slug) return err(`Type the lab's short name (${me.lab.slug}) to confirm`);
+  const g = await getSetting(gkey(me.lab_id));
+  if (g?.refresh_token) {
+    try { await fetch(`https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(g.refresh_token)}`, { method: "POST" }); } catch { /* ignore */ }
+  }
+  await deleteLabFiles(me.lab_id);
+  await sql`DELETE FROM app_settings WHERE key = ${gkey(me.lab_id)}`;
+  await sql`DELETE FROM labs WHERE id = ${me.lab_id}`; // cascades to members, protocols, inventory, activity, files, invites
+  await log({ id: me.id }, "lab_deleted", "lab", me.lab_id, me.lab.name, null);
+  return json({ ok: true });
+});
+
+// Delete your own account: sign-in, tenure record, memberships. Lab work stays with the lab as "Former member".
+route("DELETE", "/me", async ({ me, body }) => {
+  if (String(body.confirm || "").trim().toLowerCase() !== me.email) return err("Type your email address to confirm");
+  const [owns] = await sql`SELECT l.name FROM lab_members lm JOIN labs l ON l.id = lm.lab_id
+                           WHERE lm.member_id = ${me.id} AND lm.role = 'owner' LIMIT 1`;
+  if (owns) return err(`You own "${owns.name}". Delete that lab in Lab settings first (or download its backup and then delete it).`);
+  await sql`DELETE FROM pi_activities WHERE owner_id = ${me.id}`;
+  await sql`DELETE FROM ai_jobs WHERE owner_id = ${me.id}`;
+  await sql`DELETE FROM access_grants WHERE email = ${me.email}`;
+  await sql`DELETE FROM lab_members WHERE member_id = ${me.id}`;
+  await sql`UPDATE labs SET requested_by = NULL WHERE requested_by = ${me.id} AND status <> 'active'`;
+  await sql`UPDATE members SET email = ${`deleted+${me.id}@deleted.invalid`}, full_name = 'Former member', active = FALSE, last_seen = NULL
+            WHERE id = ${me.id}`;
+  try { await identityAdmin.deleteUser(me.id); } catch (e) { console.error("Identity delete failed", e.message); }
+  return json({ ok: true });
+}, { lab: false });
+
 // --- platform admin (people listed in ADMIN_EMAILS) ---
 route("GET", "/platform/labs", async ({ me }) => {
   requirePlatformAdmin(me);
   const labs = await sql`
     SELECT l.*, r.email AS requester_email, r.full_name AS requester_name,
       (SELECT COUNT(*)::int FROM lab_members lm WHERE lm.lab_id = l.id AND lm.active) AS members,
-      (SELECT COUNT(*)::int FROM protocols p WHERE p.lab_id = l.id) AS protocols,
       (SELECT COALESCE(SUM(size), 0)::float FROM media md WHERE md.lab_id = l.id) AS storage_bytes,
       (SELECT COUNT(*)::int FROM ai_jobs j WHERE j.lab_id = l.id AND j.created_at >= date_trunc('month', NOW())) AS ai_this_month,
       (SELECT string_agg(m.email, ', ') FROM lab_members lm JOIN members m ON m.id = lm.member_id WHERE lm.lab_id = l.id AND lm.role = 'owner') AS owners
@@ -1025,7 +1062,7 @@ export default async (req) => {
         }
       }
       let body = {};
-      if (["POST", "PUT"].includes(req.method) && (req.headers.get("content-type") || "").includes("application/json")) {
+      if (["POST", "PUT", "DELETE"].includes(req.method) && (req.headers.get("content-type") || "").includes("application/json")) {
         try { body = await req.json(); } catch { body = {}; }
       }
       return await r.handler({ me, body, params, query: url.searchParams, req });

@@ -111,6 +111,10 @@ lib/                      shared server code (backups, Google Drive, AI import)
 tests/                    end-to-end API tests
 ```
 
+## Privacy & data security
+
+See the [Privacy & Data Security Statement](PRIVACY.md) (also shown in the app at `/privacy`). In short: each lab's data is visible only to that lab's members; the platform admin sees usage numbers, never lab content or tenure records; lab owners can download full backups, back up automatically to their own Google Drive, and delete their lab or account at any time. Anyone who needs a hard technical guarantee can run their own private copy.
+
 ## Contributing
 
 Contributions are welcome — bug reports, features, documentation, and accounts of how your lab uses it. Please read [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md).

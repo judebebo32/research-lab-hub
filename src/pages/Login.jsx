@@ -132,6 +132,7 @@ export default function Login({ recovering = false, onDone }) {
 
         {msg && <p className="ok">{msg}</p>}
         {error && <p className="error">{error}</p>}
+        <p className="fine center"><a href="/privacy">Privacy & data security</a> · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a></p>
       </div>
     </div>
   );

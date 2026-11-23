@@ -79,6 +79,34 @@ export default function LabSettings() {
         </section>
       </div>
       <DriveBackup labName={lab.name} />
+      <DeleteLab lab={lab} />
     </>
+  );
+}
+
+function DeleteLab({ lab }) {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const del = async (e) => {
+    e.preventDefault(); setErr(""); setBusy(true);
+    try { await api.del("/lab", { confirm }); window.location.assign("/"); } catch (x) { setErr(x.message); setBusy(false); }
+  };
+  return (
+    <section className="card danger-zone">
+      <h2>Delete this lab</h2>
+      <p className="small">Permanently removes <strong>{lab.name}</strong> and everything in it — all protocols and their versions, photos and videos, inventory, activity and memberships — from the platform. Your own tenure record is not affected. <strong>Download a backup first</strong>; this can't be undone.</p>
+      {!open ? <button className="ghost danger" onClick={() => setOpen(true)}>Delete lab…</button> : (
+        <form className="form" onSubmit={del}>
+          <label>Type <code>{lab.slug}</code> to confirm<input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" /></label>
+          <ErrorMsg error={err} />
+          <div className="row">
+            <button type="button" className="ghost" onClick={() => { setOpen(false); setConfirm(""); }}>Cancel</button>
+            <button className="danger-btn" disabled={busy || confirm.trim() !== lab.slug}>{busy ? "Deleting…" : "Permanently delete lab"}</button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }

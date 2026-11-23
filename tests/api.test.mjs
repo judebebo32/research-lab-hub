@@ -211,6 +211,22 @@ r = await call(P2, "GET", "/lab"); ok(r.j.storage_limit_mb === 1 && r.j.ai_month
 await call(PI, "POST", `/platform/labs/${LAB2}/suspend`, { note: "test" });
 r = await call(P2, "GET", "/dashboard"); ok(r.s === 409, "suspended lab is closed");
 r = await call(PI, "GET", "/dashboard", undefined, LAB1); ok(r.s === 200, "other labs unaffected");
+r = await call(PI, "GET", "/platform/labs"); ok(r.j.every((l) => !("protocols" in l)), "platform view has no content counts");
+
+// --- deleting a lab and accounts ---
+await call(PI, "POST", `/platform/labs/${LAB2}/reactivate`, {});
+r = await call(ST3, "DELETE", "/lab", { confirm: "second-lab" }, LAB2); ok(r.s === 403, "only the owner can delete a lab");
+r = await call(P2, "DELETE", "/lab", { confirm: "wrong" }); ok(r.s === 400, "wrong confirmation rejected");
+r = await call(P2, "DELETE", "/lab", { confirm: "second-lab" }); ok(r.s === 200, "owner deletes lab");
+r = await call(ST3, "GET", "/me"); ok(r.j.labs.length === 1 && r.j.labs[0].lab_id === LAB1, "members lose the deleted lab only");
+r = await call(PI, "GET", "/platform/labs"); ok(!r.j.some((l) => l.id === LAB2), "deleted lab is gone from the platform");
+r = await call(PI, "DELETE", "/me", { confirm: "pi@uni.edu" }); ok(r.s === 400, "lab owners must delete their lab before their account");
+r = await call(P2, "POST", "/pi-activities", { category: "award", title: "Teaching award" });
+r = await call(P2, "DELETE", "/me", { confirm: "nope@x.com" }); ok(r.s === 400, "account delete needs email confirmation");
+r = await call(P2, "DELETE", "/me", { confirm: "prof2@other.edu" }); ok(r.s === 200 && globalThis.__DELETED_USERS.includes("u-p2"), "account deleted incl. sign-in");
+r = await call(P2, "GET", "/me"); ok(r.s === 403, "deleted account can't be used");
+r = await call(ST3, "DELETE", "/me", { confirm: "cy@uni.edu" }); ok(r.s === 200, "student deletes account");
+r = await call(PI, "GET", "/members", undefined, LAB1); ok(!r.j.some((m) => m.id === "u-st3"), "removed from lab member list");
 await db.stop();
 console.log(process.exitCode ? "\nSOME TESTS FAILED" : "\nALL TESTS PASSED");
 process.exit(process.exitCode || 0);

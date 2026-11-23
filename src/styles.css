@@ -317,3 +317,21 @@ button.swatch { width: 16px; height: 16px; min-width: 0; padding: 0; border-radi
 .quote { background: #faf9f6; border-left: 3px solid var(--line); padding: .4rem .7rem; }
 .sent { margin-top: 1rem; }
 @media (max-width: 860px) { .lab-switch { max-width: 120px; } }
+
+/* privacy & danger zone */
+.privacy-wrap { max-width: 860px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+.privacy-wrap .brand { margin-bottom: 1rem; }
+.privacy { padding: 1.6rem 2rem; line-height: 1.6; }
+.privacy h1 { font-size: 1.7rem; }
+.privacy h2 { font-size: 1.2rem; margin-top: 1.4rem; }
+.privacy h3 { font-size: 1.02rem; margin-top: 1rem; }
+.privacy table { width: 100%; min-width: 0; table-layout: auto; }
+.privacy td, .privacy th { font-size: .9rem; }
+.center { text-align: center; }
+.danger-zone { border-color: #efc9c6; }
+.danger-zone h2 { color: var(--bad); }
+button.danger-btn { background: var(--bad); border-color: var(--bad); }
+button.danger-btn:hover { background: #973532; }
+@media (max-width: 860px) { .privacy { padding: 1rem; } }
+.sidebar .platform-foot a { padding: 0; background: none; display: inline; font-weight: 400; border-radius: 0; color: var(--muted); }
+.sidebar .platform-foot a:hover { background: none; text-decoration: underline; }

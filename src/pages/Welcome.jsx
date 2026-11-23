@@ -41,7 +41,7 @@ export default function Welcome({ another = false }) {
           </section>
           <section className="card">
             <h2>🧑‍🔬 Running a lab?</h2>
-            <p className="small">Request a lab space below. Each request is reviewed by the platform admin — usually within a day or two. Your lab's data is visible only to the people you invite.</p>
+            <p className="small">Request a lab space below. Each request is reviewed by the platform admin — usually within a day or two. Your lab's data is visible only to the people you invite; the platform admin sees usage numbers, never your content. <a href="/privacy" target="_blank" rel="noreferrer">How your data is protected →</a></p>
           </section>
         </div>
       )}
@@ -72,7 +72,7 @@ export default function Welcome({ another = false }) {
           <label>Anything the admin should know? (optional)<textarea rows={2} value={f.note} onChange={set("note")} placeholder="Group size, field, what you'll use it for" /></label>
           <label className="check wrap">
             <input type="checkbox" checked={f.agree} onChange={set("agree")} />
-            <span>I'll follow the <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a>, and I'm responsible for making sure storing my lab's data here is allowed by my institution's policies.</span>
+            <span>I've read the <a href="/privacy" target="_blank" rel="noreferrer">Privacy & Data Security Statement</a>, I'll follow the <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a>, and I'm responsible for making sure storing my lab's data here is allowed by my institution's policies.</span>
           </label>
           <ErrorMsg error={error} />
           <div className="row end"><button disabled={!f.agree}>Send request</button></div>

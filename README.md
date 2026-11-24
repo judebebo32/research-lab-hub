@@ -48,6 +48,10 @@ Built by [Jude Okolie](https://judeokolie.com), a faculty member who runs a rese
 - Owner role for each lab's PI; add co-admins with fine-grained permissions (review protocols, edit protocols, manage inventory, see activity, manage students, own tenure tracker).
 - PIs can rename their lab and its short name at any time.
 
+**Works on phones**
+- Installable as an app on iPhone and Android (Add to Home Screen / Install app), with its own icon, full-screen view and quick shortcuts.
+- For privacy, lab data is never cached on the device; only the app's own code and icons are.
+
 **Backups**
 - One-click full data download.
 - Optional automatic weekly backup to the owner's Google Drive (data + photos/videos), using a Drive scope that can only see the backup folder it creates.

@@ -1,4 +1,5 @@
 import { PLATFORM_NAME } from "../config.js";
+import { InstallButton } from "../install.jsx";
 
 const REPO = "https://github.com/judebebo32/research-lab-hub";
 
@@ -41,6 +42,7 @@ export default function Landing({ onSignIn, onSignUp }) {
           <button className="ghost" onClick={onSignIn}>Sign in</button>
           <a className="btn ghost" href={REPO} target="_blank" rel="noreferrer">View the source on GitHub</a>
         </div>
+        <div className="row hero-cta"><InstallButton className="secondary" label="📲 Install on your phone" /></div>
         <p className="muted small">Students: use the invitation link from your PI. Professors: create an account and request a lab space; requests are reviewed by the platform admin.</p>
       </section>
 

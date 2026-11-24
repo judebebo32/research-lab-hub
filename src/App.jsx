@@ -18,6 +18,7 @@ import Platform from "./pages/Platform.jsx";
 import Welcome from "./pages/Welcome.jsx";
 import Privacy from "./pages/Privacy.jsx";
 import Landing from "./pages/Landing.jsx";
+import { InstallButton } from "./install.jsx";
 
 const MeContext = createContext(null);
 export const useMe = () => useContext(MeContext);
@@ -137,6 +138,7 @@ export default function App() {
             <NavLink key={to} to={to} end={to === "/"}>{label}</NavLink>
           ))}
           <div className="spacer" />
+          <InstallButton className="ghost install-link" />
           {inLab && <NavLink to="/start">+ Start another lab</NavLink>}
           <NavLink to="/profile">My profile</NavLink>
           <button className="ghost logout" onClick={() => logout()}>Log out</button>

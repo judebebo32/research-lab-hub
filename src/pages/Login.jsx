@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { PLATFORM_NAME } from "../config.js";
+import { InstallButton } from "../install.jsx";
 import { login, signup, handleAuthCallback, acceptInvite, updateUser, requestPasswordRecovery } from "@netlify/identity";
 
 // Sign in / create account, plus the links Netlify Identity emails out:
@@ -136,6 +137,7 @@ export default function Login({ recovering = false, onDone, startMode = "login",
           {onBack && <><button type="button" className="link" onClick={onBack}>About this project</button> · </>}
           <a href="/privacy">Privacy & data security</a> · <a href="https://github.com/judebebo32/research-lab-hub/blob/main/CODE_OF_CONDUCT.md" target="_blank" rel="noreferrer">Code of Conduct</a>
         </p>
+        <p className="fine center"><InstallButton className="link" label="📲 Install the app on your phone" /></p>
       </div>
     </div>
   );

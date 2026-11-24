@@ -258,6 +258,50 @@ route("GET", "/protocols", async ({ me, query }) => {
   return json(rows);
 });
 
+// Keyword / phrase search across all sections of the protocols this person may see.
+// Supports "exact phrases", OR, and -excluded words; also matches word beginnings and author names.
+const PLAIN = (col) => `regexp_replace(coalesce(${col}, ''), '<[^>]+>|\\[\\[(image|video):\\d+\\]\\]|&nbsp;', ' ', 'g')`;
+route("GET", "/protocols/search", async ({ me, query }) => {
+  const q = String(query.get("q") || "").trim().slice(0, 200);
+  if (q.length < 2) return json([]);
+  const scope = query.get("scope") || "visible"; // mine | library | visible
+  const all = seesAll(me);
+  const like = `%${q.replace(/[%_\\]/g, (c) => "\\" + c).replace(/^"|"$/g, "")}%`;
+  // Prefix query from the plain words (e.g. "centrif" finds centrifuge).
+  // Excluded words (-word) stay excluded; phrases and OR are handled by websearch syntax.
+  const tokens = q.toLowerCase().replace(/"[^"]*"/g, " ").split(/\s+/).filter((t) => t && t !== "or");
+  const plus = tokens.filter((t) => !t.startsWith("-")).flatMap((t) => t.match(/[a-z0-9]+/g) || []);
+  const minus = tokens.filter((t) => t.startsWith("-")).flatMap((t) => t.match(/[a-z0-9]+/g) || []);
+  const advanced = /"|\bor\b/i.test(q);
+  const prefix = plus.length && !advanced ? [...plus.map((w) => `${w}:*`), ...minus.map((w) => `!${w}`)].join(" & ") : null;
+  const body = sql.raw(`${PLAIN("objective")} || ' ' || ${PLAIN("materials")} || ' ' || ${PLAIN("equipment")} || ' ' || ${PLAIN("steps")} || ' ' || ${PLAIN("safety")} || ' ' || ${PLAIN("notes")}`);
+  const rows = await sql`
+    WITH qq AS (SELECT websearch_to_tsquery('english', ${q}) AS ws,
+                       CASE WHEN ${prefix}::text IS NULL THEN NULL ELSE to_tsquery('english', ${prefix}) END AS px)
+    SELECT p.id, p.title, p.project, p.experiment, p.status, p.version, p.updated_at,
+           m.full_name AS author_name, m.email AS author_email,
+           ts_rank(p.search_vector, qq.ws) + 0.5 * COALESCE(ts_rank(p.search_vector, qq.px), 0) AS rank,
+           ts_headline('english', ${body}, CASE WHEN numnode(qq.ws) > 0 THEN qq.ws ELSE qq.px END,
+             'StartSel=⟦, StopSel=⟧, MaxWords=28, MinWords=10, MaxFragments=2, FragmentDelimiter= … ') AS snippet
+    FROM protocols p JOIN members m ON m.id = p.author_id, qq
+    WHERE p.lab_id = ${me.lab_id}
+      AND (
+        CASE ${scope}
+          WHEN 'mine' THEN p.author_id = ${me.id}
+          WHEN 'library' THEN p.status = 'approved'
+          ELSE (${all} OR p.author_id = ${me.id} OR p.status = 'approved')
+        END)
+      AND (p.status <> 'archived' OR ${all} OR p.author_id = ${me.id})
+      AND (
+        (numnode(qq.ws) > 0 AND p.search_vector @@ qq.ws)
+        OR (qq.px IS NOT NULL AND p.search_vector @@ qq.px)
+        OR (${!minus.length && !advanced} AND (p.title ILIKE ${like} OR m.full_name ILIKE ${like} OR m.email ILIKE ${like}))
+      )
+    ORDER BY rank DESC, p.updated_at DESC
+    LIMIT 100`;
+  return json(rows);
+});
+
 route("POST", "/protocols", async ({ me, body }) => {
   if (!body.title?.trim()) return err("Title is required");
   const status = body.submit ? "submitted" : "draft";

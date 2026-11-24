@@ -179,6 +179,25 @@ r = await call(PI, "POST", "/pi-activities/bulk", { items: items.filter((x) => !
 const after = (await call(PI, "GET", "/pi-activities")).j; ok(after.length === before + 2 && after.some((a) => a.title.startsWith("NIH R01") && Number(a.amount) === 1800000), "entries saved to tenure record");
 globalThis.fetch = realFetch;
 
+// --- full-text protocol search ---
+LAB = LAB1;
+r = await call(PI, "POST", "/protocols", { title: "Bradford protein assay", materials: "<p>Coomassie <strong>Brilliant Blue</strong> G-250, BSA standards</p>", steps: "<ol><li>Centrifuge lysate at 14,000 × g</li><li>Read absorbance at 595 nm</li></ol>", submit: false });
+const pS1 = r.j.id; await call(PI, "POST", `/protocols/${pS1}/review`, { decision: "approved" });
+r = await call(ST, "POST", "/protocols", { title: "Draft cell freezing", steps: "<p>Use DMSO 10% in FBS, cool at -1 °C/min</p>" }); const pS2 = r.j.id;
+r = await call(PI, "GET", "/protocols/search?q=coomassie"); ok(r.s === 200 && r.j.some((x) => x.id === pS1), "finds word inside Materials (HTML stripped)");
+ok(r.j.find((x) => x.id === pS1).snippet.includes("⟦"), "snippet highlights the match");
+r = await call(PI, "GET", "/protocols/search?q=" + encodeURIComponent('"absorbance at 595"')); ok(r.j.some((x) => x.id === pS1), "exact phrase search");
+r = await call(PI, "GET", "/protocols/search?q=centrif"); ok(r.j.some((x) => x.id === pS1), "partial word (prefix) search");
+r = await call(PI, "GET", "/protocols/search?q=centrifuging"); ok(r.j.some((x) => x.id === pS1), "word forms match (stemming)");
+r = await call(PI, "GET", "/protocols/search?q=" + encodeURIComponent("coomassie -bsa")); ok(!r.j.some((x) => x.id === pS1), "minus excludes words");
+r = await call(PI, "GET", "/protocols/search?q=DMSO"); ok(r.j.some((x) => x.id === pS2), "reviewer finds student draft");
+r = await call(ST2 && ST3, "GET", "/protocols/search?q=DMSO"); ok(!r.j.some((x) => x.id === pS2), "other students can't find someone's draft");
+r = await call(ST3, "GET", "/protocols/search?q=coomassie"); ok(r.j.some((x) => x.id === pS1), "students find approved protocols");
+r = await call(ST, "GET", "/protocols/search?q=DMSO&scope=mine"); ok(r.j.length === 1 && r.j[0].id === pS2, "scope=mine");
+r = await call(PI, "GET", "/protocols/search?q=" + encodeURIComponent("amy")); ok(r.j.some((x) => x.id === pS2), "search by author name");
+r = await call(PI, "GET", "/protocols/search?q=" + encodeURIComponent("50%_' OR 1=1 --")); ok(r.s === 200, "odd characters are safe");
+LAB = null;
+
 // --- multi-lab isolation ---
 const P2 = { id: "u-p2", email: "prof2@other.edu", name: "Prof Two" };
 r = await call(P2, "POST", "/labs/requests", { name: "Second Lab", slug: "okolie-lab", institution: "Other U", agree: true }); ok(r.s === 400, "taken short name rejected");
@@ -191,6 +210,7 @@ r = await call(PI, "POST", `/platform/labs/${LAB2}/approve`, {}); ok(r.j.status 
 r = await call(P2, "GET", "/me"); ok(r.j.role === "owner" && r.j.lab.slug === "second", "second professor owns their lab");
 r = await call(P2, "GET", "/protocols?scope=all"); ok(r.j.length === 0, "new lab sees none of lab 1's protocols");
 r = await call(P2, "GET", `/protocols/${pid}`); ok(r.s === 404, "can't open lab 1 protocol by id");
+r = await call(P2, "GET", "/protocols/search?q=coomassie"); ok(r.j.length === 0, "search never crosses labs");
 r = await call(P2, "GET", "/inventory", undefined, LAB1); ok(r.s === 409, "can't pick a lab you're not in");
 r = await call(P2, "GET", "/pi-activities"); ok(r.j.length === 0, "tenure records are private per person");
 rr = await raw(P2, "GET", `/media/${mi.id}`); ok(rr.status === 403, "can't view lab 1 photos");

@@ -398,3 +398,9 @@ a.powered-netlify { color: var(--muted); text-decoration: underline; }
 .app-card ol { padding-left: 1.3rem; margin: .4rem 0 .8rem; }
 .app-card li { margin-bottom: .45rem; line-height: 1.5; }
 @media (max-width: 860px) { .app-steps { grid-template-columns: 1fr; } }
+
+/* protocol search */
+.toolbar input.protocol-search { flex: 1 1 380px; font-size: .95rem; padding: .65rem .8rem; }
+.search-info { margin: -.4rem 0 .7rem; }
+.snippet { font-size: .84rem; color: var(--muted); margin-top: .25rem; max-width: 640px; line-height: 1.45; }
+.snippet mark { background: #fff1a8; color: var(--ink); padding: 0 .1em; border-radius: 2px; }

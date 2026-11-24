@@ -388,3 +388,13 @@ a.powered-netlify { color: var(--muted); text-decoration: underline; }
 .kbd { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 0 .3rem; font-size: .85em; }
 @media (display-mode: standalone) { .landing-top { padding-top: calc(1.1rem + env(safe-area-inset-top, 0px)); } }
 .modal { text-align: left; }
+
+/* get the app */
+.get-app { margin: 3rem 0 0; text-align: center; }
+.get-app h2 { font-size: 1.7rem; margin-bottom: .5rem; }
+.get-app .small-lead { max-width: 720px; margin: 0 auto 1.4rem; color: #3b443f; }
+.app-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: left; }
+.app-card h3 { font-size: 1.15rem; }
+.app-card ol { padding-left: 1.3rem; margin: .4rem 0 .8rem; }
+.app-card li { margin-bottom: .45rem; line-height: 1.5; }
+@media (max-width: 860px) { .app-steps { grid-template-columns: 1fr; } }

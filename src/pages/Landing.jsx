@@ -27,6 +27,7 @@ export default function Landing({ onSignIn, onSignUp }) {
       <header className="landing-top">
         <div className="brand"><span className="logo" aria-hidden>⚗</span> {PLATFORM_NAME}</div>
         <nav>
+          <a href="#get-the-app">Get the app</a>
           <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
           <a href="/privacy">Privacy</a>
           <button className="ghost" onClick={onSignIn}>Sign in</button>
@@ -105,6 +106,39 @@ export default function Landing({ onSignIn, onSignUp }) {
         <figure><img src="/screenshots/inventory.jpg" alt="Inventory list with stock status and usage buttons" loading="lazy" /><figcaption>Inventory with usage logging and alerts</figcaption></figure>
       </section>
       <p className="muted small center">Screenshots use made-up sample data.</p>
+
+      <section className="get-app" id="get-the-app">
+        <p className="eyebrow">Get the app</p>
+        <h2>Use it on your phone, at the bench</h2>
+        <p className="lead small-lead">
+          No app store needed. Add {PLATFORM_NAME} to your home screen and it opens full screen like any other app, with its own icon,
+          always up to date. It's free, and for privacy no lab data is stored on the phone.
+        </p>
+        <div className="app-steps">
+          <div className="card app-card">
+            <h3><span aria-hidden>🍎</span> iPhone & iPad</h3>
+            <ol>
+              <li>Open <strong>{typeof window !== "undefined" ? window.location.host : "this site"}</strong> in <strong>Safari</strong>.</li>
+              <li>Tap the <strong>Share</strong> button <span className="kbd">⬆︎</span> at the bottom of the screen (top right on iPad).</li>
+              <li>Scroll down and tap <strong>Add to Home Screen</strong>.</li>
+              <li>Tap <strong>Add</strong>. The <em>Lab Hub</em> icon appears on your home screen.</li>
+            </ol>
+            <p className="muted small">Use Safari. Other iPhone browsers may hide the option under their own Share menu.</p>
+          </div>
+          <div className="card app-card">
+            <h3><span aria-hidden>🤖</span> Android</h3>
+            <ol>
+              <li>Open <strong>{typeof window !== "undefined" ? window.location.host : "this site"}</strong> in <strong>Chrome</strong>.</li>
+              <li>Tap <strong>Install</strong> if a banner appears, or tap the <strong>⋮</strong> menu (top right).</li>
+              <li>Choose <strong>Install app</strong> (or <strong>Add to Home screen</strong>).</li>
+              <li>Tap <strong>Install</strong>. Long-press the icon for shortcuts to <em>New protocol</em> and <em>Inventory</em>.</li>
+            </ol>
+            <p className="muted small">On a computer, Chrome and Edge show an install icon at the right end of the address bar.</p>
+          </div>
+        </div>
+        <div className="row hero-cta"><InstallButton label="📲 Install on this device" /></div>
+        <p className="muted small center">After installing, open the app and sign in with your usual email and password. Students: use your PI's invitation link first.</p>
+      </section>
 
       <section className="oss card">
         <h2>Open source project</h2>

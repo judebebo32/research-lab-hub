@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useMe } from "../App.jsx";
 import { useApi, Loading, ErrorMsg, PageHead, StatusBadge, Empty } from "../ui.jsx";
 import { api, fmtDate, who } from "../api.js";
+import AiProtocol from "./AiProtocol.jsx";
 
 // Turns ⟦match⟧ markers from the server into highlighted text (no HTML from the server is rendered).
 function Snippet({ text }) {
@@ -29,6 +30,8 @@ export default function Protocols() {
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
   const [searchErr, setSearchErr] = useState("");
+  const [aiOpen, setAiOpen] = useState(false);
+  const labAdmin = me.role === "owner" || me.role === "admin";
   const searchScope = tab === "mine" ? "mine" : tab === "library" ? "library" : "visible";
 
   // Full-text search across every section, debounced while typing.
@@ -53,8 +56,10 @@ export default function Protocols() {
   return (
     <>
       <PageHead title="Protocols" sub="Write, review and reuse experimental protocols.">
+        {labAdmin && <button className="secondary" onClick={() => setAiOpen(true)}>✨ AI protocol from notes</button>}
         <Link className="btn" to="/protocols/new">+ New protocol</Link>
       </PageHead>
+      {aiOpen && <AiProtocol onClose={() => setAiOpen(false)} />}
       <div className="tabs">
         {tabs.map(([k, label]) => (
           <button key={k} className={tab === k ? "active" : ""} onClick={() => setParams({ tab: k })}>{label}</button>

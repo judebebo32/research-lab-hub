@@ -21,6 +21,7 @@ Built by [Jude Okolie](https://judeokolie.com), a faculty member who runs a rese
 - Students write protocols as drafts and submit them; the PI (or a delegated reviewer) approves or requests changes with comments.
 - Only approved protocols appear in the lab library. Editing an approved protocol sends it back for review.
 - Full version history — every save is kept and viewable side by side.
+- **✨ AI protocol from notes (lab owners and admins only):** upload documents, photos of notebook pages or rough notes; Claude drafts a structured protocol and lists missing details. The draft opens in the editor and nothing is saved until you review it.
 - Duplicate, print and archive.
 
 **Lab inventory**

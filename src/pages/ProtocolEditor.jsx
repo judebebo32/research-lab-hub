@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
+import { AI_DRAFT_KEY } from "./AiProtocol.jsx";
 import { useMe } from "../App.jsx";
 import { api } from "../api.js";
 import { ErrorMsg, Loading, PageHead } from "../ui.jsx";
@@ -30,7 +31,13 @@ export default function ProtocolEditor() {
   const { id } = useParams();
   const { me } = useMe();
   const navigate = useNavigate();
-  const [form, setForm] = useState(EMPTY);
+  const [search] = useSearchParams();
+  // An AI draft handed over from "AI protocol from notes" (new protocols only).
+  const [aiDraft] = useState(() => {
+    if (id || !search.get("ai")) return null;
+    try { const d = JSON.parse(sessionStorage.getItem(AI_DRAFT_KEY) || "null"); sessionStorage.removeItem(AI_DRAFT_KEY); return d; } catch { return null; }
+  });
+  const [form, setForm] = useState(() => (aiDraft ? { ...EMPTY, ...Object.fromEntries(Object.keys(EMPTY).map((k) => [k, aiDraft.draft?.[k] || ""])) } : EMPTY));
   const [orig, setOrig] = useState(null);
   const [loading, setLoading] = useState(!!id);
   const [error, setError] = useState("");
@@ -69,7 +76,19 @@ export default function ProtocolEditor() {
 
   return (
     <>
-      <PageHead title={id ? `Edit: ${orig?.title || ""}` : "New protocol"} sub={id ? `Saving creates version ${(orig?.version || 0) + 1}. Earlier versions are kept.` : "Save as a draft any time, then submit for review."} />
+      <PageHead title={id ? `Edit: ${orig?.title || ""}` : aiDraft ? "Review AI-drafted protocol" : "New protocol"} sub={id ? `Saving creates version ${(orig?.version || 0) + 1}. Earlier versions are kept.` : "Save as a draft any time, then submit for review."} />
+      {aiDraft && (
+        <div className="ai-banner">
+          <p><strong>✨ Drafted by AI from {aiDraft.source || "your notes"}.</strong> Check every amount, time, temperature and step against your source before saving. Nothing has been saved yet.</p>
+          {aiDraft.truncated && <p>The source was very long, so the draft may be incomplete. Compare it with the end of your document.</p>}
+          {aiDraft.missing?.length > 0 && (
+            <>
+              <p><strong>Missing from your notes. Add these before sharing:</strong></p>
+              <ul>{aiDraft.missing.map((m, i) => <li key={i}>{m}</li>)}</ul>
+            </>
+          )}
+        </div>
+      )}
       {willResubmit && <p className="notice">This protocol is approved. Saving your edits will send it back for review, and it leaves the lab library until it's approved again.</p>}
       {orig && !isOwn && <p className="notice">You're editing {orig.author_name || orig.author_email}'s protocol. They'll see your edits in the version history.</p>}
       <div className="card form">

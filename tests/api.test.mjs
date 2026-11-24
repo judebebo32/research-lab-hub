@@ -179,6 +179,30 @@ r = await call(PI, "POST", "/pi-activities/bulk", { items: items.filter((x) => !
 const after = (await call(PI, "GET", "/pi-activities")).j; ok(after.length === before + 2 && after.some((a) => a.title.startsWith("NIH R01") && Number(a.amount) === 1800000), "entries saved to tenure record");
 globalThis.fetch = realFetch;
 
+// --- AI protocol drafting (admins only) ---
+{
+  let started = null;
+  const rf = globalThis.fetch;
+  globalThis.fetch = async (url, init = {}) => { if (String(url).includes("/.netlify/functions/tenure-ai")) { started = JSON.parse(init.body).jobId; return new Response(null, { status: 202 }); } return rf(url, init); };
+  r = await call(ST3, "POST", "/protocol-ai/jobs", { text: "lyse cells" }, LAB1); ok(r.s === 403, "students can't use AI protocol drafting");
+  r = await call(PI, "POST", "/protocol-ai/jobs", { text: "" }, LAB1); ok(r.s === 400, "empty input rejected");
+  r = await call(PI, "POST", "/protocol-ai/jobs", { files: [{ kind: "image", media_type: "image/svg+xml", data: "x" }] }, LAB1); ok(r.s === 400, "unsupported file type ignored");
+  r = await call(PI, "POST", "/protocol-ai/jobs", { text: "lyse RIPA 30 min, spin 14k", instructions: "for new students",
+    files: [{ kind: "image", name: "page1.jpg", media_type: "image/jpeg", data: "aGVsbG8=" }, { kind: "pdf", name: "old.pdf", data: "JVBERi0x" }] }, LAB1);
+  ok(r.s === 202 && started === r.j.id, "owner starts AI protocol job"); const aj = r.j.id;
+  const { runProtocolJob } = await import(ROOT + "/lib/protocolAi.mjs");
+  await runProtocolJob(aj);
+  const c = globalThis.__AI_REQ.messages[0].content;
+  ok(c.some((x) => x.type === "image") && c.some((x) => x.type === "document") && c.some((x) => x.type === "text" && x.text.includes("for new students")), "photos, PDF, notes and instructions all sent to Claude");
+  r = await call(PI, "GET", `/protocol-ai/jobs/${aj}`, undefined, LAB1); const dr = r.j.result?.draft;
+  ok(r.j.status === "done" && dr.title === "Western blot for p53" && r.j.result.missing.length === 2, "draft + missing-info list returned");
+  ok(!/<script|onerror|onclick|<img/i.test(dr.steps + dr.equipment), "unsafe HTML stripped from draft");
+  r = await call(CO, "GET", `/protocol-ai/jobs/${aj}`, undefined, LAB1); ok(r.s === 404 || r.s === 403, "others can't read your AI draft");
+  r = await call(PI, "GET", `/tenure-ai/jobs/${aj}`); ok(r.s === 404, "protocol job not visible as a tenure job");
+  r = await call(PI, "GET", "/protocols?scope=all", undefined, LAB1); ok(!r.j.some((p) => p.title === "Western blot for p53"), "nothing saved automatically");
+  globalThis.fetch = rf;
+}
+
 // --- full-text protocol search ---
 LAB = LAB1;
 r = await call(PI, "POST", "/protocols", { title: "Bradford protein assay", materials: "<p>Coomassie <strong>Brilliant Blue</strong> G-250, BSA standards</p>", steps: "<ol><li>Centrifuge lysate at 14,000 × g</li><li>Read absorbance at 595 nm</li></ol>", submit: false });
@@ -227,6 +251,7 @@ r = await call(P2, "GET", "/protocols?scope=all"); ok(r.j.some((x) => x.id === p
 await call(PI, "POST", `/platform/labs/${LAB2}/limits`, { storage_limit_mb: 1, ai_monthly_limit: 0 });
 r = await call(P2, "POST", "/media", { filename: "big.mp4", content_type: "video/mp4", size: 2 * 1024 * 1024 }); ok(r.s === 413, "storage limit enforced");
 r = await call(P2, "POST", "/tenure-ai/jobs", { text: "cv" }); ok(r.s === 429, "AI monthly limit enforced");
+r = await call(P2, "POST", "/protocol-ai/jobs", { text: "notes" }); ok(r.s === 429, "AI limit also covers protocol drafting");
 r = await call(P2, "GET", "/lab"); ok(r.j.storage_limit_mb === 1 && r.j.ai_monthly_limit === 0, "lab usage/limits visible to owner");
 await call(PI, "POST", `/platform/labs/${LAB2}/suspend`, { note: "test" });
 r = await call(P2, "GET", "/dashboard"); ok(r.s === 409, "suspended lab is closed");

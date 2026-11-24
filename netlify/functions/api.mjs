@@ -1046,6 +1046,60 @@ route("POST", "/pi-activities/bulk", async ({ me, body }) => {
   return json({ added });
 }, { lab: false });
 
+// Lab's monthly AI allowance (shared by tenure import and protocol drafting).
+async function checkAiLimit(me) {
+  const [lab] = await sql`SELECT ai_monthly_limit FROM labs WHERE id = ${me.lab_id}`;
+  if (lab.ai_monthly_limit == null) return null;
+  const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM ai_jobs WHERE lab_id = ${me.lab_id} AND created_at >= date_trunc('month', NOW())`;
+  return n >= lab.ai_monthly_limit
+    ? err(`Your lab has used its ${lab.ai_monthly_limit} AI requests for this month. They reset on the 1st, or ask the platform admin for more.`, 429)
+    : null;
+}
+async function startAiJob(req, jobId) {
+  const res = await fetch(new URL("/.netlify/functions/tenure-ai", req.url), {
+    method: "POST", headers: { "x-labhub-secret": await internalSecret(), "Content-Type": "application/json" },
+    body: JSON.stringify({ jobId }),
+  });
+  return res.status < 400;
+}
+
+// --- AI protocol drafting (lab owner and admins only, never students) ---
+const requireLabAdmin = (me) => { if (me.role === "student") deny("AI protocol drafting is for lab admins"); };
+route("POST", "/protocol-ai/jobs", async ({ me, body, req }) => {
+  requireLabAdmin(me);
+  const files = Array.isArray(body.files) ? body.files.slice(0, 8) : [];
+  const text = typeof body.text === "string" ? body.text.slice(0, 200000) : "";
+  const instructions = typeof body.instructions === "string" ? body.instructions.slice(0, 4000) : "";
+  const clean = [];
+  let bytes = 0;
+  for (const f of files) {
+    if (f?.kind === "pdf" && typeof f.data === "string") clean.push({ kind: "pdf", name: String(f.name || "").slice(0, 200), data: f.data });
+    else if (f?.kind === "image" && typeof f.data === "string" && /^image\/(jpeg|png|webp|gif)$/.test(f.media_type)) clean.push({ kind: "image", name: String(f.name || "").slice(0, 200), media_type: f.media_type, data: f.data });
+    else if (f?.kind === "text" && typeof f.text === "string") clean.push({ kind: "text", name: String(f.name || "").slice(0, 200), text: f.text.slice(0, 200000) });
+    bytes += (f?.data?.length || 0) + (f?.text?.length || 0);
+  }
+  if (!clean.length && !text.trim()) return err("Upload a document or paste your notes first");
+  if (bytes > 4.4 * 1024 * 1024) return err("Those files are too large together (about 3 MB max). Upload fewer pages or paste the text.");
+  const limited = await checkAiLimit(me);
+  if (limited) return limited;
+  const name = clean.map((f) => f.name).filter(Boolean).join(", ") || "pasted notes";
+  const [job] = await sql`INSERT INTO ai_jobs (owner_id, lab_id, kind, source_name) VALUES (${me.id}, ${me.lab_id}, 'protocol', ${name.slice(0, 200)}) RETURNING id`;
+  await aiInputs().setJSON(String(job.id), { files: clean, text, instructions });
+  if (!(await startAiJob(req, job.id))) return err("Couldn't start the AI assistant. Try again in a minute.", 502);
+  await log(me, "ai_protocol_started", null, null, name);
+  return json({ id: job.id }, 202);
+});
+route("GET", "/protocol-ai/jobs/:id", async ({ me, params }) => {
+  requireLabAdmin(me);
+  const [job] = await sql`SELECT id, status, source_name, result, error, created_at FROM ai_jobs
+                          WHERE id = ${params.id} AND owner_id = ${me.id} AND lab_id = ${me.lab_id} AND kind = 'protocol'`;
+  if (!job) notFound();
+  if (job.status === "pending" && Date.now() - new Date(job.created_at).getTime() > 5 * 60 * 1000) {
+    job.status = "error"; job.error = "The assistant never started. Please try again.";
+  }
+  return json(job);
+});
+
 // --- AI import assistant ---
 route("POST", "/tenure-ai/jobs", async ({ me, body, req }) => {
   requirePerm(me, "tenure");
@@ -1053,11 +1107,8 @@ route("POST", "/tenure-ai/jobs", async ({ me, body, req }) => {
   const pdf = typeof body.pdf_base64 === "string" ? body.pdf_base64 : "";
   if (!text.trim() && !pdf) return err("Upload a file or paste some text first");
   if (pdf.length > 4.3 * 1024 * 1024) return err("That PDF is too large (max about 3 MB). Try pasting the text instead.");
-  const [lab] = await sql`SELECT ai_monthly_limit FROM labs WHERE id = ${me.lab_id}`;
-  if (lab.ai_monthly_limit != null) {
-    const [{ n }] = await sql`SELECT COUNT(*)::int AS n FROM ai_jobs WHERE lab_id = ${me.lab_id} AND created_at >= date_trunc('month', NOW())`;
-    if (n >= lab.ai_monthly_limit) return err(`Your lab has used its ${lab.ai_monthly_limit} AI imports for this month. They reset on the 1st, or ask the platform admin for more.`, 429);
-  }
+  const limited = await checkAiLimit(me);
+  if (limited) return limited;
   const [job] = await sql`INSERT INTO ai_jobs (owner_id, lab_id, source_name) VALUES (${me.id}, ${me.lab_id}, ${String(body.name || "pasted text").slice(0, 200)}) RETURNING id`;
   await aiInputs().setJSON(String(job.id), { name: body.name || "", text, pdf_base64: pdf || null });
   const res = await fetch(new URL("/.netlify/functions/tenure-ai", req.url), {
@@ -1070,7 +1121,7 @@ route("POST", "/tenure-ai/jobs", async ({ me, body, req }) => {
 });
 route("GET", "/tenure-ai/jobs/:id", async ({ me, params }) => {
   requirePerm(me, "tenure");
-  const [job] = await sql`SELECT id, status, source_name, result, error, created_at, finished_at FROM ai_jobs WHERE id = ${params.id} AND owner_id = ${me.id}`;
+  const [job] = await sql`SELECT id, status, source_name, result, error, created_at, finished_at FROM ai_jobs WHERE id = ${params.id} AND owner_id = ${me.id} AND kind = 'tenure'`;
   if (!job) notFound();
   if (job.status === "pending" && Date.now() - new Date(job.created_at).getTime() > 5 * 60 * 1000) {
     job.status = "error"; job.error = "The assistant never started. Please try again.";

@@ -80,4 +80,5 @@ export const ACTION_LABELS = {
   drive_backup_started: "",
   drive_settings: "",
   ai_import_started: "ran AI import on",
+  ai_protocol_started: "drafted a protocol with AI from",
 };
